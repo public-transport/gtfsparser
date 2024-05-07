@@ -1164,7 +1164,7 @@ func (feed *Feed) parseStopTimes(path string, prefix string, geofiltered map[str
 	for record = reader.ParseCsvLine(); record != nil; record = reader.ParseCsvLine() {
 		i += 1
 
-		trip, stopTimeSeq, e := createStopTime(record, flds, feed, prefix)
+		trip, stopTimeSeq, e := createStopTime(record, &flds, feed, prefix)
 
 		if e != nil {
 			wasFiltered := false
