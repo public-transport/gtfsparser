@@ -173,12 +173,7 @@ func (a Time) SecondsSinceMidnight() int {
 // GetLocationTime returns the time.Time of the gtfs time on a certain
 // date, for a certain agency (which itself holds a timezone)
 func (a Time) GetLocationTime(d Date, agency *Agency) time.Time {
-	loc := agency.Timezone.GetLocation()
-	if loc == nil {
-		panic("Don't know timezone " + agency.Timezone.GetTzString())
-	}
-
-	return time.Date(int(d.Year()), time.Month(d.Month()), int(d.Day()), int(a.Hour), int(a.Minute), int(a.Second), 0, loc)
+	return time.Date(int(d.Year()), time.Month(d.Month()), int(d.Day()), int(a.Hour), int(a.Minute), int(a.Second), 0, agency.Timezone)
 }
 
 // HasDistanceTraveled returns true if this ShapePoint has a measurement

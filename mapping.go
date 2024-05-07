@@ -15,12 +15,11 @@ import (
 	url "net/url"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/public-transport/gtfsparser/gtfs"
 	"github.com/valyala/fastjson/fastfloat"
 )
-
-var emptyTz, _ = gtfs.NewTimezone("")
 
 // csv lookup structs
 type Fields interface {
@@ -1782,9 +1781,9 @@ func getMail(id int, r []string, flds Fields, req bool, ignErrs bool, feed *Feed
 	return nil
 }
 
-func getTimezone(id int, r []string, flds Fields, req bool, ignErrs bool, feed *Feed) gtfs.Timezone {
+func getTimezone(id int, r []string, flds Fields, req bool, ignErrs bool, feed *Feed) *time.Location {
 	if id >= 0 && id < len(r) && len(r[id]) > 0 {
-		tz, e := gtfs.NewTimezone(r[id])
+		tz, e := time.LoadLocation(r[id])
 		if e != nil && (req || !ignErrs) {
 			panic(e)
 		} else if e != nil {
@@ -1795,6 +1794,8 @@ func getTimezone(id int, r []string, flds Fields, req bool, ignErrs bool, feed *
 	} else if req {
 		panic(fmt.Errorf("expected required field '%s'", flds.FldName(id)))
 	}
+	emptyTz, _ := time.LoadLocation("")
+
 	return emptyTz
 }
 

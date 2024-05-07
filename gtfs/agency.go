@@ -9,6 +9,7 @@ package gtfs
 import (
 	mail "net/mail"
 	url "net/url"
+	"time"
 )
 
 // An Agency represents a transit agency in GTFS
@@ -16,7 +17,7 @@ type Agency struct {
 	Id           string
 	Name         string
 	Url          *url.URL
-	Timezone     Timezone
+	Timezone     *time.Location
 	Lang         LanguageISO6391
 	Phone        string
 	Fare_url     *url.URL
