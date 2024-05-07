@@ -1139,7 +1139,7 @@ func reserveStopTime(r []string, flds StopTimeFields, feed *Feed, prefix string)
 	return nil
 }
 
-func createStopTime(r []string, flds StopTimeFields, feed *Feed, prefix string) (t *gtfs.Trip, st *gtfs.StopTime, err error) {
+func createStopTime(r []string, flds StopTimeFields, feed *Feed, prefix string) (t *gtfs.Trip, stopTimeSeq int, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = r.(error)
@@ -1166,7 +1166,7 @@ func createStopTime(r []string, flds StopTimeFields, feed *Feed, prefix string) 
 		// this trip will later be deleted - dont store stop times for it!
 		s := trip.Service
 		if (s.IsEmpty() && s.Start_date().IsEmpty() && s.End_date().IsEmpty()) || s.GetFirstActiveDate().IsEmpty() {
-			return trip, &a, nil
+			return trip, a.Sequence(), nil
 		}
 	}
 
@@ -1244,7 +1244,7 @@ func createStopTime(r []string, flds StopTimeFields, feed *Feed, prefix string) 
 
 	trip.StopTimes = append(trip.StopTimes, a)
 
-	return trip, &a, nil
+	return trip, a.Sequence(), nil
 }
 
 func createTrip(r []string, flds TripFields, feed *Feed, prefix string) (t *gtfs.Trip, err error) {
