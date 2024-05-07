@@ -10,7 +10,7 @@ import (
 	hex "encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/patrickbr/gtfsparser/gtfs"
+	"github.com/public-transport/gtfsparser/gtfs"
 	"github.com/valyala/fastjson/fastfloat"
 	"math"
 	mail "net/mail"

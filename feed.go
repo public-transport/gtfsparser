@@ -11,7 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/klauspost/compress/zip"
-	"github.com/patrickbr/gtfsparser/gtfs"
+	"github.com/public-transport/gtfsparser/gtfs"
 	"io"
 	"math"
 	"os"
