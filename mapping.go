@@ -1962,33 +1962,52 @@ func getTime(id int, r []string, fldName string) gtfs.Time {
 		return gtfs.Time{Second: int8(-1), Minute: int8(-1), Hour: int8(-1)}
 	}
 
+	// Use strings.Cut here as this function is very hot due to being called from createStopTimes, and splitting would allocate.
+	// This is also the reason for the somewhat clunky variable pre-allocation and error handler structure.
 	var hour, minute, second int64
-	parts := strings.Split(r[id], ":")
 	var e error
+	var hourStr, minuteStr, secondStr string
+	var found bool
+	remaining := r[id]
 
-	if len(parts) != 3 || len(parts[0]) == 0 || len(parts[1]) != 2 || len(parts[2]) != 2 {
-		e = fmt.Errorf("Expected HH:MM:SS time for field '%s', found '%s' (%s)", fldName, errFldPrep(r[id]), e.Error())
+	hourStr, remaining, found = strings.Cut(remaining, ":")
+	if !found || len(hourStr) == 0 {
+		goto fail
 	}
 
-	if e == nil {
-		hour, e = fastfloat.ParseInt64(parts[0])
+	hour, e = fastfloat.ParseInt64(hourStr)
+	if e != nil {
+		goto fail
 	}
-	if e == nil {
-		minute, e = fastfloat.ParseInt64(parts[1])
+
+	minuteStr, remaining, found = strings.Cut(remaining, ":")
+	if !found || len(minuteStr) != 2 {
+		goto fail
 	}
-	if e == nil {
-		second, e = fastfloat.ParseInt64(parts[2])
+
+	minute, e = fastfloat.ParseInt64(minuteStr)
+	if e != nil {
+		goto fail
+	}
+
+	secondStr, _, found = strings.Cut(remaining, ":")
+	if len(secondStr) != 2 {
+		goto fail
+	}
+
+	second, e = fastfloat.ParseInt64(secondStr)
+	if e != nil {
+		goto fail
 	}
 
 	if hour > 127 {
 		panic(fmt.Errorf("Max representable time is '127:59:59', found '%s' for field %s", errFldPrep(r[id]), fldName))
 	}
 
-	if e != nil {
-		panic(fmt.Errorf("Expected HH:MM:SS time for field '%s', found '%s' (%s)", fldName, errFldPrep(r[id]), e.Error()))
-	} else {
-		return gtfs.Time{Hour: int8(hour), Minute: int8(minute), Second: int8(second)}
-	}
+	return gtfs.Time{Hour: int8(hour), Minute: int8(minute), Second: int8(second)}
+
+fail:
+	panic(fmt.Errorf("Expected HH:MM:SS time for field '%s', found '%s' (%s)", fldName, errFldPrep(r[id]), e.Error()))
 }
 
 func getNullablePositiveFloat(id int, r []string, flds Fields, ignErrs bool, feed *Feed) float32 {
