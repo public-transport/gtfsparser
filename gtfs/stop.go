@@ -9,6 +9,7 @@ package gtfs
 import (
 	"math"
 	url "net/url"
+	"time"
 )
 
 // A Stop object describes a single stop location
@@ -27,7 +28,7 @@ type Stop struct {
 	Translations        []*Translation
 	Level               *Level
 	Platform_code       string
-	Timezone            Timezone
+	Timezone            *time.Location
 }
 
 // HasLatLon returns true if this Stop has a latitude and longitude
