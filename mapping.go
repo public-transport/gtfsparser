@@ -10,13 +10,14 @@ import (
 	hex "encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/public-transport/gtfsparser/gtfs"
-	"github.com/valyala/fastjson/fastfloat"
 	"math"
 	mail "net/mail"
 	url "net/url"
 	"regexp"
 	"strings"
+
+	"github.com/public-transport/gtfsparser/gtfs"
+	"github.com/valyala/fastjson/fastfloat"
 )
 
 var emptyTz, _ = gtfs.NewTimezone("")
@@ -635,7 +636,7 @@ type StopNotFoundErr struct {
 }
 
 func (e *StopNotFoundErr) Error() string {
-	return "No stop with id " + e.sid + " found."
+	return "no stop with id " + e.sid + " found"
 }
 
 func (e *StopNotFoundErr) StopId() string {
@@ -649,7 +650,7 @@ type RouteNotFoundErr struct {
 }
 
 func (e *RouteNotFoundErr) Error() string {
-	return "No route with id " + e.rid + " found."
+	return "no route with id " + e.rid + " found"
 }
 
 func (e *RouteNotFoundErr) RouteId() string {
@@ -666,7 +667,7 @@ type TripNotFoundErr struct {
 }
 
 func (e *TripNotFoundErr) Error() string {
-	return "No trip with id " + e.tid + " found."
+	return "no trip with id " + e.tid + " found"
 }
 
 func (e *TripNotFoundErr) TripId() string {
@@ -702,13 +703,13 @@ func createTranslation(r []string, flds TranslationFields, feed *Feed, prefix st
 			if ag, ok := feed.Agencies[prefix+id]; ok {
 				ag.Translations = append(ag.Translations, tr)
 			} else {
-				panic(fmt.Errorf("No agency with id %s found", id))
+				panic(fmt.Errorf("no agency with id %s found", id))
 			}
 		} else if tableName == "stops" {
 			if st, ok := feed.Stops[prefix+id]; ok {
 				st.Translations = append(st.Translations, tr)
 			} else {
-				panic(fmt.Errorf("No stop with id %s found", id))
+				panic(fmt.Errorf("no stop with id %s found", id))
 			}
 		} else if tableName == "trips" {
 			if trip, ok := feed.Trips[prefix+id]; ok {
@@ -721,18 +722,18 @@ func createTranslation(r []string, flds TranslationFields, feed *Feed, prefix st
 				panic(&TripNotFoundErr{prefix, id})
 			}
 		} else if tableName == "feed_info" {
-			panic(fmt.Errorf("Cannot use record_id for table_name 'feed_info'"))
+			panic(fmt.Errorf("cannot use record_id for table_name 'feed_info'"))
 		} else if tableName == "pathways" {
 			if pw, ok := feed.Pathways[prefix+id]; ok {
 				pw.Translations = append(pw.Translations, tr)
 			} else {
-				panic(fmt.Errorf("No pathway with id %s found", id))
+				panic(fmt.Errorf("no pathway with id %s found", id))
 			}
 		} else if tableName == "levels" {
 			if lvl, ok := feed.Levels[prefix+id]; ok {
 				lvl.Translations = append(lvl.Translations, tr)
 			} else {
-				panic(fmt.Errorf("No level with id %s found", id))
+				panic(fmt.Errorf("no level with id %s found", id))
 			}
 		}
 	}
@@ -764,14 +765,14 @@ func createAttribution(r []string, flds AttributionFields, feed *Feed, prefix st
 	tripId := getString(flds.tripId, r, flds.FldName(flds.tripId), false, false, "")
 
 	if (len(routeId) != 0 && len(agencyId) != 0) || (len(routeId) != 0 && len(tripId) != 0) || (len(tripId) != 0 && len(agencyId) != 0) {
-		return nil, nil, nil, nil, errors.New("Only one of route_id, agency_id or trip_id can be set!")
+		return nil, nil, nil, nil, errors.New("only one of route_id, agency_id or trip_id can be set")
 	}
 
 	if len(agencyId) > 0 {
 		if val, ok := feed.Agencies[prefix+agencyId]; ok {
 			ag = val
 		} else {
-			panic(fmt.Errorf("No agency with id %s found", agencyId))
+			panic(fmt.Errorf("no agency with id %s found", agencyId))
 		}
 	}
 
@@ -856,7 +857,7 @@ func createFrequency(r []string, flds FrequencyFields, feed *Feed, prefix string
 	a.End_time = getTime(flds.endTime, r, flds.FldName(flds.endTime))
 
 	if a.Start_time.SecondsSinceMidnight() > a.End_time.SecondsSinceMidnight() {
-		panic(errors.New("Frequency has start_time > end_time."))
+		panic(errors.New("frequency has start_time > end_time"))
 	}
 
 	a.Headway_secs = getPositiveInt(flds.headwaySecs, r, flds.FldName(flds.headwaySecs), true)
@@ -891,10 +892,10 @@ func createRoute(r []string, flds RouteFields, feed *Feed, prefix string) (route
 				if len(feed.Agencies) == 1 {
 					a.Agency = nil
 				} else {
-					return nil, errors.New("Agency with id " + getString(flds.agencyId, r, flds.FldName(flds.agencyId), false, false, "") + " not found or erroneous, cannot fall back to no agency as there is more than one agency in agency.txt.")
+					return nil, errors.New("agency with id " + getString(flds.agencyId, r, flds.FldName(flds.agencyId), false, false, "") + " not found or erroneous, cannot fall back to no agency as there is more than one agency in agency.txt")
 				}
 			} else {
-				return nil, errors.New("No agency with id " + getString(flds.agencyId, r, flds.FldName(flds.agencyId), false, false, "") + " found.")
+				return nil, errors.New("no agency with id " + getString(flds.agencyId, r, flds.FldName(flds.agencyId), false, false, "") + " found")
 			}
 		}
 	} else if len(prefix) == 0 && len(feed.Agencies) == 1 {
@@ -917,10 +918,10 @@ func createRoute(r []string, flds RouteFields, feed *Feed, prefix string) (route
 		if c == 1 {
 			a.Agency = feed.Agencies[aId]
 		} else {
-			return nil, errors.New("No agency given for route " + a.Id + ", an agency is required as there is more than one agency in agency.txt.")
+			return nil, errors.New("no agency given for route " + a.Id + ", an agency is required as there is more than one agency in agency.txt")
 		}
 	} else {
-		return nil, errors.New("No agency given for route " + a.Id + ", an agency is required as there is more than one agency in agency.txt.")
+		return nil, errors.New("no agency given for route " + a.Id + ", an agency is required as there is more than one agency in agency.txt")
 	}
 
 	a.Short_name = getString(flds.routeShortName, r, flds.FldName(flds.routeShortName), false, false, "")
@@ -930,7 +931,7 @@ func createRoute(r []string, flds RouteFields, feed *Feed, prefix string) (route
 		if feed.opts.UseDefValueOnError {
 			a.Short_name = "-"
 		} else {
-			return nil, errors.New("Either route_short_name or route_long_name are required.")
+			return nil, errors.New("either route_short_name or route_long_name are required")
 		}
 	}
 
@@ -972,7 +973,7 @@ func createServiceFromCalendar(r []string, flds CalendarFields, feed *Feed, pref
 	service.SetEnd_date(getDate(flds.endDate, r, flds, true, false, feed))
 
 	if service.End_date().GetTime().Before(service.Start_date().GetTime()) {
-		return nil, errors.New("Service " + getString(flds.serviceId, r, flds.FldName(flds.serviceId), true, true, "") + " has end date before start date.")
+		return nil, errors.New("Service " + getString(flds.serviceId, r, flds.FldName(flds.serviceId), true, true, "") + " has end date before start date")
 	}
 
 	return service, nil
@@ -1003,7 +1004,7 @@ func createServiceFromCalendarDates(r []string, flds CalendarDatesFields, feed *
 	// may be nil during dry run
 	if service != nil {
 		if _, ok := service.Exceptions()[date]; ok {
-			return nil, errors.New("Date exception for service id " + getString(flds.serviceId, r, flds.FldName(flds.serviceId), true, true, "") + " defined 2 times for one date.")
+			return nil, errors.New("Date exception for service id " + getString(flds.serviceId, r, flds.FldName(flds.serviceId), true, true, "") + " defined 2 times for one date")
 		}
 		if (filterDateEnd.IsEmpty() || !date.GetTime().After(filterDateEnd.GetTime())) &&
 			(filterDateStart.IsEmpty() || !date.GetTime().Before(filterDateStart.GetTime())) {
@@ -1043,7 +1044,7 @@ func createStop(r []string, flds StopFields, feed *Feed, prefix string) (s *gtfs
 			a.Lat = lat
 			a.Lon = lon
 		} else if !math.IsNaN(float64(lat)) {
-			locErr := fmt.Errorf("stop_lat and stop_lon are optional for location_type=%d, but only stop_lon was ommitted here, and stop_lat was defined.", a.Location_type)
+			locErr := fmt.Errorf("stop_lat and stop_lon are optional for location_type=%d, but only stop_lon was ommitted here, and stop_lat was defined", a.Location_type)
 			if feed.opts.UseDefValueOnError {
 				feed.warn(locErr)
 				a.Lat = float32(math.NaN())
@@ -1052,7 +1053,7 @@ func createStop(r []string, flds StopFields, feed *Feed, prefix string) (s *gtfs
 				panic(locErr)
 			}
 		} else if !math.IsNaN(float64(lon)) {
-			locErr := fmt.Errorf("stop_lat and stop_lon are optional for location_type=%d, but only stop_lat was ommitted here, and stop_lon was defined.", a.Location_type)
+			locErr := fmt.Errorf("stop_lat and stop_lon are optional for location_type=%d, but only stop_lat was ommitted here, and stop_lon was defined", a.Location_type)
 			if feed.opts.UseDefValueOnError {
 				feed.warn(locErr)
 				a.Lat = float32(math.NaN())
@@ -1068,16 +1069,16 @@ func createStop(r []string, flds StopFields, feed *Feed, prefix string) (s *gtfs
 
 	// check for incorrect coordinates
 	if a.HasLatLon() && math.Abs(float64(a.Lat)) > 90 {
-		panic(fmt.Errorf("Expected coordinate (lat, lon), instead found (%f, %f), latitude is not in the allowed range [-90, 90].", a.Lat, a.Lon))
+		panic(fmt.Errorf("expected coordinate (lat, lon), instead found (%f, %f), latitude is not in the allowed range [-90, 90]", a.Lat, a.Lon))
 	}
 
 	if a.HasLatLon() && math.Abs(float64(a.Lon)) > 180 {
-		panic(fmt.Errorf("Expected coordinate (lat, lon), instead found (%f, %f), longitude is not in the allowed range [-180, 180].", a.Lat, a.Lon))
+		panic(fmt.Errorf("expected coordinate (lat, lon), instead found (%f, %f), longitude is not in the allowed range [-180, 180]", a.Lat, a.Lon))
 	}
 
 	// check for 0,0 coordinates, which are most definitely an error
 	if a.HasLatLon() && feed.opts.CheckNullCoordinates && math.Abs(float64(a.Lat)) < 0.0001 && math.Abs(float64(a.Lon)) < 0.0001 {
-		panic(fmt.Errorf("Expected coordinate (lat, lon), instead found (0, 0), which is in the middle of the atlantic."))
+		panic(fmt.Errorf("expected coordinate (lat, lon), instead found (0, 0), which is in the middle of the atlantic"))
 	}
 
 	a.Zone_id = prefix + getString(flds.zoneId, r, flds.FldName(flds.zoneId), false, false, "")
@@ -1095,7 +1096,7 @@ func createStop(r []string, flds StopFields, feed *Feed, prefix string) (s *gtfs
 		parentId = prefix + getString(flds.parentStation, r, flds.FldName(flds.parentStation), false, false, "")
 	} else {
 		if len(getString(flds.parentStation, r, flds.FldName(flds.parentStation), false, false, "")) > 0 {
-			panic(fmt.Errorf("'parent_station' cannot be defined for location_type=1."))
+			panic(fmt.Errorf("'parent_station' cannot be defined for location_type=1"))
 		}
 	}
 
@@ -1109,7 +1110,7 @@ func createStop(r []string, flds StopFields, feed *Feed, prefix string) (s *gtfs
 		if val, ok := feed.Levels[levelId]; ok {
 			a.Level = val
 		} else {
-			panic(errors.New("No level with id " + getString(flds.levelId, r, flds.FldName(flds.levelId), false, true, "") + " found."))
+			panic(errors.New("no level with id " + getString(flds.levelId, r, flds.FldName(flds.levelId), false, true, "") + " found"))
 		}
 	}
 
@@ -1196,7 +1197,7 @@ func createStopTime(r []string, flds *StopTimeFields, feed *Feed, prefix string)
 		if feed.opts.UseDefValueOnError {
 			a.SetArrival_time(a.Departure_time())
 		} else {
-			panic(errors.New("Missing arrival time for " + getString(flds.stopId, r, flds.FldName(flds.stopId), true, true, "") + "."))
+			panic(errors.New("Missing arrival time for " + getString(flds.stopId, r, flds.FldName(flds.stopId), true, true, "") + ""))
 		}
 	}
 
@@ -1204,12 +1205,12 @@ func createStopTime(r []string, flds *StopTimeFields, feed *Feed, prefix string)
 		if feed.opts.UseDefValueOnError {
 			a.SetDeparture_time(a.Arrival_time())
 		} else {
-			panic(errors.New("Missing departure time for " + getString(flds.stopId, r, flds.FldName(flds.stopId), true, true, "") + "."))
+			panic(errors.New("Missing departure time for " + getString(flds.stopId, r, flds.FldName(flds.stopId), true, true, "") + ""))
 		}
 	}
 
 	if a.Arrival_time().SecondsSinceMidnight() > a.Departure_time().SecondsSinceMidnight() {
-		panic(errors.New("Departure before arrival at stop " + getString(flds.stopId, r, flds.FldName(flds.stopId), true, true, "") + "."))
+		panic(errors.New("Departure before arrival at stop " + getString(flds.stopId, r, flds.FldName(flds.stopId), true, true, "") + ""))
 	}
 
 	a.SetSequence(getRangeInt(flds.stopSequence, r, flds.FldName(flds.stopSequence), true, 0, int(^uint32(0)>>1)))
@@ -1232,7 +1233,7 @@ func createStopTime(r []string, flds *StopTimeFields, feed *Feed, prefix string)
 	a.SetTimepoint(getBool(flds.timepoint, r, flds.FldName(flds.timepoint), false, !a.Arrival_time().Empty() && !a.Departure_time().Empty(), feed.opts.UseDefValueOnError, feed))
 
 	if (a.Arrival_time().Empty() || a.Departure_time().Empty()) && a.Timepoint() {
-		locErr := errors.New("Stops with timepoint=1 cannot have empty arrival or departure time")
+		locErr := errors.New("stops with timepoint=1 cannot have empty arrival or departure time")
 		if feed.opts.UseDefValueOnError {
 			a.SetTimepoint(false)
 			feed.warn(locErr)
@@ -1265,7 +1266,7 @@ func createTrip(r []string, flds TripFields, feed *Feed, prefix string) (t *gtfs
 	if val, ok := feed.Services[prefix+getString(flds.serviceId, r, flds.FldName(flds.serviceId), true, true, "")]; ok {
 		a.Service = val
 	} else {
-		panic(fmt.Errorf("No service with id %s found", getString(flds.serviceId, r, flds.FldName(flds.serviceId), true, true, "")))
+		panic(fmt.Errorf("no service with id %s found", getString(flds.serviceId, r, flds.FldName(flds.serviceId), true, true, "")))
 	}
 
 	toDel := false
@@ -1310,7 +1311,7 @@ func createTrip(r []string, flds TripFields, feed *Feed, prefix string) (t *gtfs
 			if val, ok := feed.Shapes[shapeID]; ok {
 				a.Shape = val
 			} else {
-				locErr := fmt.Errorf("No shape with id %s found", shapeID)
+				locErr := fmt.Errorf("no shape with id %s found", shapeID)
 				if len(feed.opts.PolygonFilter) > 0 {
 					a.Shape = nil
 				} else if feed.opts.UseDefValueOnError {
@@ -1402,16 +1403,16 @@ func createShapePoint(r []string, flds ShapeFields, feed *Feed, prefix string) (
 
 	// check for incorrect coordinates
 	if math.Abs(float64(lat)) > 90 {
-		panic(fmt.Errorf("Expected coordinate (lat, lon), instead found (%f, %f), latitude is not in the allowed range [-90, 90].", lat, lon))
+		panic(fmt.Errorf("expected coordinate (lat, lon), instead found (%f, %f), latitude is not in the allowed range [-90, 90]", lat, lon))
 	}
 
 	if math.Abs(float64(lon)) > 180 {
-		panic(fmt.Errorf("Expected coordinate (lat, lon), instead found (%f, %f), longitude is not in the allowed range [-180, 180].", lat, lon))
+		panic(fmt.Errorf("expected coordinate (lat, lon), instead found (%f, %f), longitude is not in the allowed range [-180, 180]", lat, lon))
 	}
 
 	// check for 0,0 coordinates, which are most definitely an error
 	if feed.opts.CheckNullCoordinates && math.Abs(float64(lat)) < 0.0001 && math.Abs(float64(lon)) < 0.0001 {
-		panic(fmt.Errorf("Expected coordinate (lat, lon), instead found (0, 0), which is in the middle of the atlantic."))
+		panic(fmt.Errorf("expected coordinate (lat, lon), instead found (0, 0), which is in the middle of the atlantic"))
 	}
 
 	// check if any defined PolygonFilter contains the shape point
@@ -1469,7 +1470,7 @@ func createFareAttribute(r []string, flds FareAttributeFields, feed *Feed, prefi
 			if feed.opts.UseDefValueOnError {
 				a.Agency = nil
 			} else {
-				return nil, errors.New("No agency with id " + getString(flds.agencyId, r, flds.FldName(flds.agencyId), false, false, "") + " found.")
+				return nil, errors.New("no agency with id " + getString(flds.agencyId, r, flds.FldName(flds.agencyId), false, false, "") + " found")
 			}
 		}
 	} else {
@@ -1483,13 +1484,13 @@ func createFareAttribute(r []string, flds FareAttributeFields, feed *Feed, prefi
 				}
 			}
 			if prefixCount > 1 {
-				return nil, errors.New("Expected a non-empty value for 'agency_id', as there are multiple agencies defined in agency.txt.")
+				return nil, errors.New("expected a non-empty value for 'agency_id', as there are multiple agencies defined in agency.txt")
 			} else if prefixCount == 1 {
 				a.Agency = feed.Agencies[foundId]
 			}
 		} else {
 			if len(feed.Agencies) > 1 {
-				return nil, errors.New("Expected a non-empty value for 'agency_id', as there are multiple agencies defined in agency.txt.")
+				return nil, errors.New("expected a non-empty value for 'agency_id', as there are multiple agencies defined in agency.txt")
 			}
 		}
 	}
@@ -1505,15 +1506,13 @@ func createFareRule(r []string, flds FareRuleFields, feed *Feed, prefix string) 
 	}()
 
 	var fareattr *gtfs.FareAttribute
-	var fareid string
-
-	fareid = prefix + getString(flds.fareId, r, flds.FldName(flds.fareId), true, true, "")
+	var fareid string = prefix + getString(flds.fareId, r, flds.FldName(flds.fareId), true, true, "")
 
 	// first, check if the service already exists
 	if val, ok := feed.FareAttributes[fareid]; ok {
 		fareattr = val
 	} else {
-		panic(fmt.Errorf("No fare attribute with id %s found", fareid))
+		panic(fmt.Errorf("no fare attribute with id %s found", fareid))
 	}
 
 	// create fare attribute
@@ -1630,7 +1629,7 @@ func createPathway(r []string, flds PathwayFields, feed *Feed, prefix string) (t
 	if val, ok := feed.Stops[prefix+getString(flds.fromStopId, r, flds.FldName(flds.fromStopId), true, true, "")]; ok {
 		a.From_stop = val
 		if a.From_stop.Location_type == 1 {
-			panic(errors.New("Stop for 'from_stop_id' with id " + getString(flds.fromStopId, r, flds.FldName(flds.fromStopId), true, true, "") + " has location_type=1 (Station). Only stops/platforms (location_type=0), entrances/exits (location_type=2), generic nodes (location_type=3) or boarding areas (location_type=4) are allowed here."))
+			panic(errors.New("Stop for 'from_stop_id' with id " + getString(flds.fromStopId, r, flds.FldName(flds.fromStopId), true, true, "") + " has location_type=1 (Station). Only stops/platforms (location_type=0), entrances/exits (location_type=2), generic nodes (location_type=3) or boarding areas (location_type=4) are allowed here"))
 		}
 	} else {
 		panic(&StopNotFoundErr{prefix, getString(flds.fromStopId, r, flds.FldName(flds.fromStopId), true, true, "")})
@@ -1639,7 +1638,7 @@ func createPathway(r []string, flds PathwayFields, feed *Feed, prefix string) (t
 	if val, ok := feed.Stops[prefix+getString(flds.toStopId, r, flds.FldName(flds.toStopId), true, true, "")]; ok {
 		a.To_stop = val
 		if a.To_stop.Location_type == 1 {
-			panic(errors.New("Stop for 'to_stop_id' with id " + getString(flds.toStopId, r, flds.FldName(flds.toStopId), true, true, "") + " has location_type=1 (Station). Only stops/platforms (location_type=0), entrances/exits (location_type=2), generic nodes (location_type=3) or boarding areas (location_type=4) are allowed here."))
+			panic(errors.New("Stop for 'to_stop_id' with id " + getString(flds.toStopId, r, flds.FldName(flds.toStopId), true, true, "") + " has location_type=1 (Station). Only stops/platforms (location_type=0), entrances/exits (location_type=2), generic nodes (location_type=3) or boarding areas (location_type=4) are allowed here"))
 		}
 	} else {
 		panic(&StopNotFoundErr{prefix, getString(flds.toStopId, r, flds.FldName(flds.toStopId), true, true, "")})
@@ -1697,13 +1696,13 @@ func getString(id int, r []string, fldName string, req bool, nonempty bool, empt
 			if len(emptyrepl) > 0 {
 				return emptyrepl
 			} else {
-				panic(fmt.Errorf("Expected non-empty string for field '%s'", fldName))
+				panic(fmt.Errorf("expected non-empty string for field '%s'", fldName))
 			}
 		} else {
 			return trimmed
 		}
 	} else if req {
-		panic(fmt.Errorf("Expected required field '%s'", fldName))
+		panic(fmt.Errorf("expected required field '%s'", fldName))
 	}
 	return ""
 }
@@ -1759,7 +1758,7 @@ func getURL(id int, r []string, flds Fields, req bool, ignErrs bool, feed *Feed)
 		}
 		return u
 	} else if req {
-		panic(fmt.Errorf("Expected required field '%s'", flds.FldName(id)))
+		panic(fmt.Errorf("expected required field '%s'", flds.FldName(id)))
 	}
 	return nil
 }
@@ -1778,7 +1777,7 @@ func getMail(id int, r []string, flds Fields, req bool, ignErrs bool, feed *Feed
 		}
 		return u
 	} else if req {
-		panic(fmt.Errorf("Expected required field '%s'", flds.FldName(id)))
+		panic(fmt.Errorf("expected required field '%s'", flds.FldName(id)))
 	}
 	return nil
 }
@@ -1794,7 +1793,7 @@ func getTimezone(id int, r []string, flds Fields, req bool, ignErrs bool, feed *
 		}
 		return tz
 	} else if req {
-		panic(fmt.Errorf("Expected required field '%s'", flds.FldName(id)))
+		panic(fmt.Errorf("expected required field '%s'", flds.FldName(id)))
 	}
 	return emptyTz
 }
@@ -1810,7 +1809,7 @@ func getIsoLangCode(id int, r []string, fldName string, req bool, ignErrs bool, 
 		}
 		return l
 	} else if req {
-		panic(fmt.Errorf("Expected required field '%s'", fldName))
+		panic(fmt.Errorf("expected required field '%s'", fldName))
 	}
 	l, _ := gtfs.NewLanguageISO6391("")
 	return l
@@ -1819,7 +1818,7 @@ func getIsoLangCode(id int, r []string, fldName string, req bool, ignErrs bool, 
 func getColor(id int, r []string, fldName string, req bool, def string, ignErrs bool, feed *Feed) string {
 	if id >= 0 && id < len(r) && len(r[id]) > 0 {
 		if len(r[id]) != 6 {
-			locErr := fmt.Errorf("Expected six-character hexadecimal number as color for field '%s' (found: %s)", fldName, errFldPrep(r[id]))
+			locErr := fmt.Errorf("expected six-character hexadecimal number as color for field '%s' (found: %s)", fldName, errFldPrep(r[id]))
 			if ignErrs {
 				feed.warn(locErr)
 				return def
@@ -1828,7 +1827,7 @@ func getColor(id int, r []string, fldName string, req bool, def string, ignErrs 
 		}
 
 		if _, e := hex.DecodeString(r[id]); e != nil {
-			locErr := fmt.Errorf("Expected hexadecimal number as color for field '%s' (found: %s)", fldName, r[id])
+			locErr := fmt.Errorf("expected hexadecimal number as color for field '%s' (found: %s)", fldName, r[id])
 			if ignErrs {
 				feed.warn(locErr)
 				return def
@@ -1837,7 +1836,7 @@ func getColor(id int, r []string, fldName string, req bool, def string, ignErrs 
 		}
 		return strings.ToUpper(r[id])
 	} else if req {
-		locErr := fmt.Errorf("Expected required field '%s'", fldName)
+		locErr := fmt.Errorf("expected required field '%s'", fldName)
 		if ignErrs {
 			feed.warn(locErr)
 			return def
@@ -1851,7 +1850,7 @@ func getIntWithDefault(id int, r []string, fldName string, def int, ignErrs bool
 	if id >= 0 && id < len(r) && len(r[id]) > 0 {
 		num, err := fastfloat.ParseInt64(r[id])
 		if err != nil {
-			locErr := fmt.Errorf("Expected integer for field '%s', found '%s'", fldName, errFldPrep(r[id]))
+			locErr := fmt.Errorf("expected integer for field '%s', found '%s'", fldName, errFldPrep(r[id]))
 			if ignErrs {
 				feed.warn(locErr)
 				return def
@@ -1867,11 +1866,11 @@ func getPositiveInt(id int, r []string, fldName string, req bool) int {
 	if id >= 0 && id < len(r) && len(r[id]) > 0 {
 		num, err := fastfloat.ParseInt64(r[id])
 		if err != nil || num < 0 {
-			panic(fmt.Errorf("Expected positive integer for field '%s', found '%s'", fldName, errFldPrep(r[id])))
+			panic(fmt.Errorf("expected positive integer for field '%s', found '%s'", fldName, errFldPrep(r[id])))
 		}
 		return int(num)
 	} else if req {
-		panic(fmt.Errorf("Expected required field '%s'", fldName))
+		panic(fmt.Errorf("expected required field '%s'", fldName))
 	}
 	return 0
 }
@@ -1880,7 +1879,7 @@ func getPositiveIntWithDefault(id int, r []string, fldName string, def int, ignE
 	if id >= 0 && id < len(r) && len(r[id]) > 0 {
 		num, err := fastfloat.ParseInt64(r[id])
 		if err != nil || num < 0 {
-			locErr := fmt.Errorf("Expected positive integer for field '%s', found '%s'", fldName, errFldPrep(r[id]))
+			locErr := fmt.Errorf("expected positive integer for field '%s', found '%s'", fldName, errFldPrep(r[id]))
 			if ignErrs {
 				feed.warn(locErr)
 				return def
@@ -1896,16 +1895,16 @@ func getRangeInt(id int, r []string, fldName string, req bool, min int, max int)
 	if id >= 0 && id < len(r) && len(r[id]) > 0 {
 		num, err := fastfloat.ParseInt64(r[id])
 		if err != nil {
-			panic(fmt.Errorf("Expected integer for field '%s', found '%s'", fldName, errFldPrep(r[id])))
+			panic(fmt.Errorf("expected integer for field '%s', found '%s'", fldName, errFldPrep(r[id])))
 		}
 
 		if int(num) > max || int(num) < min {
-			panic(fmt.Errorf("Expected integer between %d and %d for field '%s', found %s", min, max, fldName, errFldPrep(r[id])))
+			panic(fmt.Errorf("expected integer between %d and %d for field '%s', found %s", min, max, fldName, errFldPrep(r[id])))
 		}
 
 		return int(num)
 	} else if req {
-		panic(fmt.Errorf("Expected required field '%s'", fldName))
+		panic(fmt.Errorf("expected required field '%s'", fldName))
 	}
 	return 0
 }
@@ -1914,7 +1913,7 @@ func getRangeIntWithDefault(id int, r []string, fldName string, min int, max int
 	if id >= 0 && id < len(r) && len(r[id]) > 0 {
 		num, err := fastfloat.ParseInt64(r[id])
 		if err != nil {
-			locErr := fmt.Errorf("Expected integer for field '%s', found '%s'", fldName, errFldPrep(r[id]))
+			locErr := fmt.Errorf("expected integer for field '%s', found '%s'", fldName, errFldPrep(r[id]))
 			if ignErrs {
 				feed.warn(locErr)
 				return def
@@ -1923,7 +1922,7 @@ func getRangeIntWithDefault(id int, r []string, fldName string, min int, max int
 		}
 
 		if int(num) > max || int(num) < min {
-			locErr := fmt.Errorf("Expected integer between %d and %d for field '%s', found %s", min, max, fldName, errFldPrep(r[id]))
+			locErr := fmt.Errorf("expected integer between %d and %d for field '%s', found %s", min, max, fldName, errFldPrep(r[id]))
 			if ignErrs {
 				feed.warn(locErr)
 				return def
@@ -1941,21 +1940,21 @@ func getFloat(id int, r []string, fldName string, req bool) float32 {
 		num, err := fastfloat.Parse(r[id])
 		if err != nil || math.IsNaN(num) {
 			// try with comma as decimal separator
-			num, err = fastfloat.Parse(strings.Replace(r[id], ",", ".", 1))
+			num, err = fastfloat.Parse(strings.Replace(r[id], ",", "", 1))
 		}
 		if err != nil || math.IsNaN(num) {
-			panic(fmt.Errorf("Expected float for field '%s', found '%s'", fldName, errFldPrep(r[id])))
+			panic(fmt.Errorf("expected float for field '%s', found '%s'", fldName, errFldPrep(r[id])))
 		}
 		return float32(num)
 	} else if req {
-		panic(fmt.Errorf("Expected required field '%s'", fldName))
+		panic(fmt.Errorf("expected required field '%s'", fldName))
 	}
 	return -1
 }
 
 func getTime(id int, r []string, fldName string) gtfs.Time {
 	if id < 0 {
-		panic(fmt.Errorf("Expected required field '%s'", fldName))
+		panic(fmt.Errorf("expected required field '%s'", fldName))
 	}
 
 	if id >= len(r) || len(r[id]) == 0 {
@@ -1990,7 +1989,7 @@ func getTime(id int, r []string, fldName string) gtfs.Time {
 		goto fail
 	}
 
-	secondStr, _, found = strings.Cut(remaining, ":")
+	secondStr, _, _ = strings.Cut(remaining, ":")
 	if len(secondStr) != 2 {
 		goto fail
 	}
@@ -2001,13 +2000,13 @@ func getTime(id int, r []string, fldName string) gtfs.Time {
 	}
 
 	if hour > 127 {
-		panic(fmt.Errorf("Max representable time is '127:59:59', found '%s' for field %s", errFldPrep(r[id]), fldName))
+		panic(fmt.Errorf("max representable time is '127:59:59', found '%s' for field %s", errFldPrep(r[id]), fldName))
 	}
 
 	return gtfs.Time{Hour: int8(hour), Minute: int8(minute), Second: int8(second)}
 
 fail:
-	panic(fmt.Errorf("Expected HH:MM:SS time for field '%s', found '%s' (%s)", fldName, errFldPrep(r[id]), e.Error()))
+	panic(fmt.Errorf("expected HH:MM:SS time for field '%s', found '%s' (%s)", fldName, errFldPrep(r[id]), e.Error()))
 }
 
 func getNullablePositiveFloat(id int, r []string, flds Fields, ignErrs bool, feed *Feed) float32 {
@@ -2015,10 +2014,10 @@ func getNullablePositiveFloat(id int, r []string, flds Fields, ignErrs bool, fee
 		num, err := fastfloat.Parse(r[id])
 		if err != nil || math.IsNaN(num) {
 			// try with comma as decimal separator
-			num, err = fastfloat.Parse(strings.Replace(r[id], ",", ".", 1))
+			num, err = fastfloat.Parse(strings.Replace(r[id], ",", "", 1))
 		}
 		if err != nil || math.IsNaN(num) || num < 0 {
-			locErr := fmt.Errorf("Expected positive float for field '%s', found '%s'", flds.FldName(id), errFldPrep(r[id]))
+			locErr := fmt.Errorf("expected positive float for field '%s', found '%s'", flds.FldName(id), errFldPrep(r[id]))
 			if ignErrs {
 				feed.warn(locErr)
 				return float32(math.NaN())
@@ -2035,10 +2034,10 @@ func getNullableFloat(id int, r []string, fldName string, ignErrs bool, feed *Fe
 		num, err := fastfloat.Parse(r[id])
 		if err != nil || math.IsNaN(num) {
 			// try with comma as decimal separator
-			num, err = fastfloat.Parse(strings.Replace(r[id], ",", ".", 1))
+			num, err = fastfloat.Parse(strings.Replace(r[id], ",", "", 1))
 		}
 		if err != nil || math.IsNaN(num) {
-			locErr := fmt.Errorf("Expected float for field '%s', found '%s'", fldName, errFldPrep(r[id]))
+			locErr := fmt.Errorf("expected float for field '%s', found '%s'", fldName, errFldPrep(r[id]))
 			if ignErrs {
 				feed.warn(locErr)
 				return float32(math.NaN())
@@ -2058,7 +2057,7 @@ func getBool(id int, r []string, fldName string, req bool, def bool, ignErrs boo
 	if len(val) > 0 {
 		num, err := fastfloat.ParseInt64(val)
 		if err != nil || (num != 0 && num != 1) {
-			locErr := fmt.Errorf("Expected 1 or 0 for field '%s', found '%s'", fldName, errFldPrep(val))
+			locErr := fmt.Errorf("expected 1 or 0 for field '%s', found '%s'", fldName, errFldPrep(val))
 			if ignErrs {
 				feed.warn(locErr)
 				return def
@@ -2067,7 +2066,7 @@ func getBool(id int, r []string, fldName string, req bool, def bool, ignErrs boo
 		}
 		return num == 1
 	} else if req {
-		locErr := fmt.Errorf("Expected required field '%s'", fldName)
+		locErr := fmt.Errorf("expected required field '%s'", fldName)
 		if ignErrs {
 			feed.warn(locErr)
 			return def
@@ -2080,7 +2079,7 @@ func getBool(id int, r []string, fldName string, req bool, def bool, ignErrs boo
 func getDate(id int, r []string, flds Fields, req bool, ignErrs bool, feed *Feed) gtfs.Date {
 	if id < 0 || id >= len(r) || len(r[id]) == 0 {
 		if req {
-			locErr := fmt.Errorf("Expected required field '%s'", flds.FldName(id))
+			locErr := fmt.Errorf("expected required field '%s'", flds.FldName(id))
 			if ignErrs {
 				feed.warn(locErr)
 				return gtfs.Date{}
@@ -2121,7 +2120,7 @@ func getDate(id int, r []string, flds Fields, req bool, ignErrs bool, feed *Feed
 	}
 
 	if e != nil {
-		locErr := fmt.Errorf("Expected YYYYMMDD date for field '%s', found '%s' (%s)", flds.FldName(id), errFldPrep(str), e.Error())
+		locErr := fmt.Errorf("expected YYYYMMDD date for field '%s', found '%s' (%s)", flds.FldName(id), errFldPrep(str), e.Error())
 		if !ignErrs {
 			panic(locErr)
 		}

@@ -10,14 +10,15 @@ import (
 	// "archive/zip"
 	"errors"
 	"fmt"
-	"github.com/klauspost/compress/zip"
-	"github.com/public-transport/gtfsparser/gtfs"
 	"io"
 	"math"
 	"os"
 	opath "path"
 	"sort"
 	"unicode"
+
+	"github.com/klauspost/compress/zip"
+	"github.com/public-transport/gtfsparser/gtfs"
 )
 
 // Holds the original column ordering
@@ -278,7 +279,7 @@ func (feed *Feed) PrefixParse(path string, prefix string) error {
 	}
 
 	if e == nil {
-		e = feed.reserveStopTimes(path, prefix, filteredTrips)
+		e = feed.reserveStopTimes(path, prefix)
 	}
 	if e == nil {
 		e = feed.parseStopTimes(path, prefix, geofilteredStops, filteredTrips)
@@ -303,7 +304,7 @@ func (feed *Feed) PrefixParse(path string, prefix string) error {
 		e = feed.parseFrequencies(path, prefix, filteredTrips)
 	}
 	if e == nil {
-		e = feed.parseTransfers(path, prefix, geofilteredStops, filteredRoutes)
+		e = feed.parseTransfers(path, prefix, geofilteredStops)
 	}
 	if e == nil {
 		e = feed.parsePathways(path, prefix, geofilteredStops)
@@ -327,13 +328,13 @@ func (feed *Feed) PrefixParse(path string, prefix string) error {
 	}
 
 	if !feed.opts.DateFilterStart.IsEmpty() || !feed.opts.DateFilterEnd.IsEmpty() {
-		feed.filterServices(prefix)
+		feed.filterServices()
 	}
 
 	return e
 }
 
-func (feed *Feed) filterServices(prefix string) {
+func (feed *Feed) filterServices() {
 	toDel := make([]*gtfs.Service, 0)
 	for _, t := range feed.Trips {
 		s := t.Service
@@ -375,7 +376,7 @@ func (feed *Feed) getFile(path string, name string) (io.Reader, error) {
 	}
 
 	// check for any directory that is a ZIP file
-	zipDir := feed.getGTFSDir(feed.zipFileCloser)
+	zipDir := feed.getGTFSDir()
 
 	if !feed.opts.ZipFix {
 		zipDir = ""
@@ -388,14 +389,14 @@ func (feed *Feed) getFile(path string, name string) (io.Reader, error) {
 		}
 	}
 
-	return nil, errors.New("Not found")
+	return nil, errors.New("not found")
 }
 
 func (feed *Feed) parseAgencies(path string, prefix string) (err error) {
 	file, e := feed.getFile(path, "agency.txt")
 
 	if e != nil {
-		return errors.New("Could not open required file agency.txt")
+		return errors.New("could not open required file agency.txt")
 	}
 
 	reader := NewCsvParser(file, feed.opts.DropErroneous, false)
@@ -427,7 +428,7 @@ func (feed *Feed) parseAgencies(path string, prefix string) (err error) {
 		agency, e := createAgency(record, flds, feed, prefix)
 		if e == nil {
 			if _, ok := feed.Agencies[agency.Id]; ok {
-				e = errors.New("ID collision, agency_id '" + agency.Id + "' already used.")
+				e = errors.New("ID collision, agency_id '" + agency.Id + "' already used")
 			}
 		}
 
@@ -440,7 +441,7 @@ func (feed *Feed) parseAgencies(path string, prefix string) (err error) {
 			}
 
 			if len(existingAgId) > 0 && feed.Agencies[existingAgId].Timezone != agency.Timezone {
-				e = fmt.Errorf("Agency '%s' has a different timezone (%s) than existing agencies (%s). All agencies must have the same timezone.", agency.Id, agency.Timezone.GetTzString(), feed.Agencies[existingAgId].Timezone.GetTzString())
+				e = fmt.Errorf("agency '%s' has a different timezone (%s) than existing agencies (%s). All agencies must have the same timezone", agency.Id, agency.Timezone.GetTzString(), feed.Agencies[existingAgId].Timezone.GetTzString())
 			}
 		}
 
@@ -476,7 +477,7 @@ func (feed *Feed) parseStops(path string, prefix string, geofiltered map[string]
 	file, e := feed.getFile(path, "stops.txt")
 
 	if e != nil {
-		return errors.New("Could not open required file stops.txt")
+		return errors.New("could not open required file stops.txt")
 	}
 
 	reader := NewCsvParser(file, feed.opts.DropErroneous, false)
@@ -516,7 +517,7 @@ func (feed *Feed) parseStops(path string, prefix string, geofiltered map[string]
 		stop, parentId, e := createStop(record, flds, feed, prefix)
 		if e == nil {
 			if _, ok := feed.Stops[stop.Id]; ok {
-				e = errors.New("ID collision, stop_id '" + stop.Id + "' already used.")
+				e = errors.New("ID collision, stop_id '" + stop.Id + "' already used")
 			}
 		}
 		if e != nil {
@@ -567,7 +568,7 @@ func (feed *Feed) parseStops(path string, prefix string, geofiltered map[string]
 	for id, pid := range parentStopIds {
 		pstop, ok := feed.Stops[pid]
 		if !ok {
-			locErr := errors.New("(for stop id " + id + ") No station with id " + pid + " found, cannot use as parent station here.")
+			locErr := errors.New("(for stop id " + id + ") No station with id " + pid + " found, cannot use as parent station here")
 			_, wasFiltered := geofiltered[pid]
 
 			// note: if type >= 2, a parent Id is *required*
@@ -590,7 +591,7 @@ func (feed *Feed) parseStops(path string, prefix string, geofiltered map[string]
 		}
 
 		if (feed.Stops[id].Location_type == 0 || feed.Stops[id].Location_type == 2 || feed.Stops[id].Location_type == 3) && pstop.Location_type != 1 {
-			locErr := fmt.Errorf("(for stop id %s) Station with id %s has location_type=%d, cannot use as parent station here for stop with location_type=%d (must be 1).", id, pid, pstop.Location_type, feed.Stops[id].Location_type)
+			locErr := fmt.Errorf("(for stop id %s) Station with id %s has location_type=%d, cannot use as parent station here for stop with location_type=%d (must be 1)", id, pid, pstop.Location_type, feed.Stops[id].Location_type)
 			if feed.opts.UseDefValueOnError && !(feed.Stops[id].Location_type == 2 || feed.Stops[id].Location_type == 3) {
 				// continue, the default value "nil" has already be written above
 				feed.warn(locErr)
@@ -607,7 +608,7 @@ func (feed *Feed) parseStops(path string, prefix string, geofiltered map[string]
 		}
 
 		if feed.Stops[id].Location_type == 4 && pstop.Location_type != 0 {
-			locErr := fmt.Errorf("(for stop id %s) Station with id %s has location_type=%d, cannot use as parent station here for stop with location_type=4 (boarding area), which expects a parent station with location_type=0 (stop/platform).", id, pid, pstop.Location_type)
+			locErr := fmt.Errorf("(for stop id %s) Station with id %s has location_type=%d, cannot use as parent station here for stop with location_type=4 (boarding area), which expects a parent station with location_type=0 (stop/platform)", id, pid, pstop.Location_type)
 			if feed.opts.DropErroneous {
 				// delete the erroneous entry
 				delete(feed.Stops, id)
@@ -629,7 +630,7 @@ func (feed *Feed) parseRoutes(path string, prefix string, filtered map[string]st
 	file, e := feed.getFile(path, "routes.txt")
 
 	if e != nil {
-		return errors.New("Could not open required file routes.txt")
+		return errors.New("could not open required file routes.txt")
 	}
 
 	reader := NewCsvParser(file, feed.opts.DropErroneous, false)
@@ -666,7 +667,7 @@ func (feed *Feed) parseRoutes(path string, prefix string, filtered map[string]st
 		route, e := createRoute(record, flds, feed, prefix)
 		if e == nil {
 			if _, ok := feed.Routes[route.Id]; ok {
-				e = errors.New("ID collision, route_id '" + route.Id + "' already used.")
+				e = errors.New("ID collision, route_id '" + route.Id + "' already used")
 			}
 		}
 		if e != nil {
@@ -850,7 +851,7 @@ func (feed *Feed) parseTrips(path string, prefix string, filteredRoutes map[stri
 	file, e := feed.getFile(path, "trips.txt")
 
 	if e != nil {
-		return errors.New("Could not open required file trips.txt")
+		return errors.New("could not open required file trips.txt")
 	}
 
 	reader := NewCsvParser(file, feed.opts.DropErroneous, false)
@@ -893,7 +894,7 @@ func (feed *Feed) parseTrips(path string, prefix string, filteredRoutes map[stri
 			dummy.SetSequence(0)
 			trip.StopTimes = append(trip.StopTimes, dummy)
 			if _, ok := feed.Trips[tripId]; ok {
-				e = errors.New("ID collision, trip_id '" + tripId + "' already used.")
+				e = errors.New("ID collision, trip_id '" + tripId + "' already used")
 			}
 		} else {
 			routeNotFoundErr, routeNotFound := e.(*RouteNotFoundErr)
@@ -1042,7 +1043,7 @@ func (feed *Feed) parseShapes(path string, prefix string) (err error) {
 		// sort points in shapes, drop empty shapes
 		for id, shape := range feed.Shapes {
 			if len(shape.Points) == 0 {
-				loce := fmt.Errorf("Shape #%s has no points", id)
+				loce := fmt.Errorf("shape #%s has no points", id)
 				if feed.opts.DropErroneous || len(feed.opts.PolygonFilter) > 0 {
 					// dont warn here, because this can only happen if a shape point
 					// has been deleted before
@@ -1070,11 +1071,11 @@ func (feed *Feed) parseShapes(path string, prefix string) (err error) {
 	return e
 }
 
-func (feed *Feed) reserveStopTimes(path string, prefix string, filteredTrips map[string]struct{}) (err error) {
+func (feed *Feed) reserveStopTimes(path string, prefix string) (err error) {
 	file, e := feed.getFile(path, "stop_times.txt")
 
 	if e != nil {
-		return errors.New("Could not open required file stop_times.txt")
+		return errors.New("could not open required file stop_times.txt")
 	}
 	reader := NewCsvParser(file, feed.opts.DropErroneous, false)
 
@@ -1103,7 +1104,7 @@ func (feed *Feed) reserveStopTimes(path string, prefix string, filteredTrips map
 	file, e = feed.getFile(path, "stop_times.txt")
 
 	if e != nil {
-		return errors.New("Could not open required file stop_times.txt")
+		return errors.New("could not open required file stop_times.txt")
 	}
 
 	reader = NewCsvParser(file, feed.opts.DropErroneous, feed.opts.AssumeCleanCsv && flds.stopHeadsign < 0 && !feed.opts.KeepAddFlds)
@@ -1119,7 +1120,7 @@ func (feed *Feed) parseStopTimes(path string, prefix string, geofiltered map[str
 	file, e := feed.getFile(path, "stop_times.txt")
 
 	if e != nil {
-		return errors.New("Could not open required file stop_times.txt")
+		return errors.New("could not open required file stop_times.txt")
 	}
 	reader := NewCsvParser(file, feed.opts.DropErroneous, feed.opts.AssumeCleanCsv && !feed.opts.KeepAddFlds)
 
@@ -1154,7 +1155,7 @@ func (feed *Feed) parseStopTimes(path string, prefix string, geofiltered map[str
 	file, e = feed.getFile(path, "stop_times.txt")
 
 	if e != nil {
-		return errors.New("Could not open required file stop_times.txt")
+		return errors.New("could not open required file stop_times.txt")
 	}
 
 	reader = NewCsvParser(file, feed.opts.DropErroneous, feed.opts.AssumeCleanCsv && flds.stopHeadsign < 0)
@@ -1417,7 +1418,7 @@ func (feed *Feed) parseFareAttributeRules(path string, prefix string, filteredRo
 	return e
 }
 
-func (feed *Feed) parseTransfers(path string, prefix string, geofiltered map[string]struct{}, filteredRoutes map[string]struct{}) (err error) {
+func (feed *Feed) parseTransfers(path string, prefix string, geofiltered map[string]struct{}) (err error) {
 	file, e := feed.getFile(path, "transfers.txt")
 
 	if e != nil {
@@ -1452,7 +1453,7 @@ func (feed *Feed) parseTransfers(path string, prefix string, geofiltered map[str
 		tk, tv, e := createTransfer(record, flds, feed, prefix)
 		if e == nil {
 			if _, ok := feed.Transfers[tk]; ok {
-				e = errors.New("ID collision, transfer already defined.")
+				e = errors.New("ID collision, transfer already defined")
 			}
 		}
 		if e != nil {
@@ -1534,7 +1535,7 @@ func (feed *Feed) parsePathways(path string, prefix string, geofiltered map[stri
 		pw, e := createPathway(record, flds, feed, prefix)
 		if e == nil {
 			if _, ok := feed.Pathways[pw.Id]; ok {
-				e = errors.New("ID collision, pathway_id '" + pw.Id + "' already used.")
+				e = errors.New("ID collision, pathway_id '" + pw.Id + "' already used")
 			}
 		}
 		if e != nil {
@@ -1677,7 +1678,7 @@ func (feed *Feed) parseAttributions(path string, prefix string, filteredRoutes m
 				attr.Id = ""
 			}
 			if _, ok := ids[attr.Id]; ok {
-				e = errors.New("ID collision, attribution_id '" + attr.Id + "' already used.")
+				e = errors.New("ID collision, attribution_id '" + attr.Id + "' already used")
 			}
 			if len(attr.Id) > 0 {
 				ids[attr.Id] = true
@@ -1769,7 +1770,7 @@ func (feed *Feed) parseLevels(path string, idprefix string) (err error) {
 		lvl, e := createLevel(record, flds, feed, idprefix)
 		if e == nil {
 			if _, ok := feed.Levels[lvl.Id]; ok {
-				e = errors.New("ID collision, level_id '" + lvl.Id + "' already used.")
+				e = errors.New("ID collision, level_id '" + lvl.Id + "' already used")
 			}
 		}
 
@@ -1869,7 +1870,7 @@ func (feed *Feed) checkShapeMeasure(shape *gtfs.Shape, opt *ParseOptions) error 
 		i := j - deleted
 
 		if shape.Points[i-1].Sequence == shape.Points[i].Sequence {
-			e := fmt.Errorf("In shape '%s' for point with seq=%d: stop time sequence collision. Sequence has to increase along shape.", shape.Id, shape.Points[i].Sequence)
+			e := fmt.Errorf("in shape '%s' for point with seq=%d: stop time sequence collision. Sequence has to increase along shape", shape.Id, shape.Points[i].Sequence)
 			if feed.opts.DropErroneous {
 				feed.ErrorStats.DroppedStopTimes++
 				shape.Points = shape.Points[:i+copy(shape.Points[i:], shape.Points[i+1:])]
@@ -1886,7 +1887,7 @@ func (feed *Feed) checkShapeMeasure(shape *gtfs.Shape, opt *ParseOptions) error 
 		}
 
 		if shape.Points[i].HasDistanceTraveled() && max > shape.Points[i].Dist_traveled {
-			e := fmt.Errorf("In shape '%s' for point with seq=%d shape_dist_traveled does not increase along with stop_sequence (%f > %f)", shape.Id, shape.Points[i].Sequence, max, shape.Points[i].Dist_traveled)
+			e := fmt.Errorf("in shape '%s' for point with seq=%d shape_dist_traveled does not increase along with stop_sequence (%f > %f)", shape.Id, shape.Points[i].Sequence, max, shape.Points[i].Dist_traveled)
 			if opt.UseDefValueOnError {
 				shape.Points[i].Dist_traveled = float32(math.NaN())
 				feed.warn(e)
@@ -1910,7 +1911,7 @@ func (feed *Feed) checkStopTimeMeasure(trip *gtfs.Trip, opt *ParseOptions) error
 		i := j - deleted
 
 		if trip.StopTimes[i-1].Sequence() == trip.StopTimes[i].Sequence() {
-			e := fmt.Errorf("In trip '%s' for stoptime with seq=%d: stop time sequence collision. Sequence has to increase along trip.", trip.Id, trip.StopTimes[i].Sequence())
+			e := fmt.Errorf("in trip '%s' for stoptime with seq=%d: stop time sequence collision. Sequence has to increase along trip", trip.Id, trip.StopTimes[i].Sequence())
 			if feed.opts.DropErroneous {
 				feed.ErrorStats.DroppedStopTimes++
 				trip.StopTimes = trip.StopTimes[:i+copy(trip.StopTimes[i:], trip.StopTimes[i+1:])]
@@ -1923,7 +1924,7 @@ func (feed *Feed) checkStopTimeMeasure(trip *gtfs.Trip, opt *ParseOptions) error
 		}
 
 		if !trip.StopTimes[i-1].Departure_time().Empty() && !trip.StopTimes[i].Arrival_time().Empty() && trip.StopTimes[i-1].Departure_time().SecondsSinceMidnight() > trip.StopTimes[i].Arrival_time().SecondsSinceMidnight() {
-			e := fmt.Errorf("In trip '%s' for stoptime with seq=%d the arrival time is before the departure in the previous station", trip.Id, trip.StopTimes[i].Sequence())
+			e := fmt.Errorf("in trip '%s' for stoptime with seq=%d the arrival time is before the departure in the previous station", trip.Id, trip.StopTimes[i].Sequence())
 			if opt.DropErroneous {
 				feed.ErrorStats.DroppedStopTimes++
 				trip.StopTimes = trip.StopTimes[:i+copy(trip.StopTimes[i:], trip.StopTimes[i+1:])]
@@ -1940,7 +1941,7 @@ func (feed *Feed) checkStopTimeMeasure(trip *gtfs.Trip, opt *ParseOptions) error
 		}
 
 		if trip.StopTimes[i].HasDistanceTraveled() && max > trip.StopTimes[i].Shape_dist_traveled() {
-			e := fmt.Errorf("In trip '%s' for stoptime with seq=%d shape_dist_traveled does not increase along with stop_sequence (%f > %f)", trip.Id, trip.StopTimes[i].Sequence(), max, trip.StopTimes[i].Shape_dist_traveled())
+			e := fmt.Errorf("in trip '%s' for stoptime with seq=%d shape_dist_traveled does not increase along with stop_sequence (%f > %f)", trip.Id, trip.StopTimes[i].Sequence(), max, trip.StopTimes[i].Shape_dist_traveled())
 			if opt.UseDefValueOnError {
 				trip.StopTimes[i].SetShape_dist_traveled(float32(math.NaN()))
 				feed.warn(e)
@@ -2043,7 +2044,7 @@ func polyContCheck(ax float64, ay float64, bx float64, by float64, cx float64, c
 	return 0
 }
 
-func (feed *Feed) getGTFSDir(zip *zip.ReadCloser) string {
+func (feed *Feed) getGTFSDir() string {
 	// count number of GTFS file occurances in folders,
 	// return the folder with the most GTFS files
 

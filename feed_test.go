@@ -49,7 +49,7 @@ func TestFeedParsing(t *testing.T) {
 		return
 	}
 
-	shp, _ := feedFailA.Shapes["C_shp"]
+	shp := feedFailA.Shapes["C_shp"]
 
 	for i, p := range shp.Points {
 		if i > 0 && p.HasDistanceTraveled() && shp.Points[i-1].HasDistanceTraveled() && p.Dist_traveled <= shp.Points[i-1].Dist_traveled {
