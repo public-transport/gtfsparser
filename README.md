@@ -1,4 +1,4 @@
-[![Go Report Card](https://goreportcard.com/badge/github.com/patrickbr/gtfsparser)](https://goreportcard.com/report/github.com/patrickbr/gtfsparser) [![Build Status](https://travis-ci.org/patrickbr/gtfsparser.svg?branch=master)](https://travis-ci.org/patrickbr/gtfsparser) [![GoDoc](https://godoc.org/github.com/patrickbr/gtfsparser?status.png)](https://godoc.org/github.com/patrickbr/gtfsparser)
+[![Go Report Card](https://goreportcard.com/badge/github.com/public-transport/gtfsparser)](https://goreportcard.com/report/github.com/public-transport/gtfsparser) [![GoDoc](https://godoc.org/github.com/public-transport/gtfsparser?status.png)](https://godoc.org/github.com/public-transport/gtfsparser)
 
 # go gtfsparser
 
@@ -18,7 +18,7 @@ Parsing of the [GTFS example feed](https://developers.google.com/transit/gtfs/ex
     
 ```go
 import (
-	"github.com/patrickbrosi/gtfsparser"
+	"github.com/public-transport/gtfsparser"
 	"fmt"
 )
 
