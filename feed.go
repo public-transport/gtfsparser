@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"net/url"
 	"os"
 	opath "path"
 	"sort"
@@ -94,6 +95,7 @@ type ParseOptions struct {
 	DryRun                bool
 	CheckNullCoordinates  bool
 	EmptyStringRepl       string
+	EmptyAgencyUrlRepl    string
 	ZipFix                bool
 	ShowWarnings          bool
 	DropShapes            bool
@@ -212,7 +214,7 @@ func NewFeed() *Feed {
 		NumShpPoints:          0,
 		NumStopTimes:          0,
 		fastParsePossible:     true,
-		opts:                  ParseOptions{false, false, false, false, "", false, false, false, false, gtfs.Date{}, gtfs.Date{}, make([]Polygon, 0), false, make(map[int16]bool, 0), make(map[int16]bool, 0), false},
+		opts:                  ParseOptions{false, false, false, false, "", "", false, false, false, false, gtfs.Date{}, gtfs.Date{}, make([]Polygon, 0), false, make(map[int16]bool, 0), make(map[int16]bool, 0), false},
 	}
 	g.lastString = &g.emptyString
 
@@ -249,7 +251,7 @@ func (feed *Feed) PrefixParse(path string, prefix string) error {
 	// with -De
 	filteredTrips := make(map[string]struct{}, 0)
 
-	e = feed.parseAgencies(path, prefix)
+	e = feed.parseAgencies(path, prefix, feed.opts.EmptyAgencyUrlRepl)
 	if e == nil {
 		e = feed.parseFeedInfos(path)
 	}
@@ -392,7 +394,7 @@ func (feed *Feed) getFile(path string, name string) (io.Reader, error) {
 	return nil, errors.New("not found")
 }
 
-func (feed *Feed) parseAgencies(path string, prefix string) (err error) {
+func (feed *Feed) parseAgencies(path string, prefix string, fallbackUrl string) (err error) {
 	file, e := feed.getFile(path, "agency.txt")
 
 	if e != nil {
@@ -426,6 +428,13 @@ func (feed *Feed) parseAgencies(path string, prefix string) (err error) {
 	}
 	for record = reader.ParseCsvLine(); record != nil; record = reader.ParseCsvLine() {
 		agency, e := createAgency(record, flds, feed, prefix)
+		if agency.Url == nil {
+			fbUrl, err := url.Parse(fallbackUrl)
+			if err != nil {
+				panic(err)
+			}
+			agency.Url = fbUrl
+		}
 		if e == nil {
 			if _, ok := feed.Agencies[agency.Id]; ok {
 				e = errors.New("ID collision, agency_id '" + agency.Id + "' already used")
