@@ -428,13 +428,6 @@ func (feed *Feed) parseAgencies(path string, prefix string, fallbackUrl string) 
 	}
 	for record = reader.ParseCsvLine(); record != nil; record = reader.ParseCsvLine() {
 		agency, e := createAgency(record, flds, feed, prefix)
-		if agency.Url == nil {
-			fbUrl, err := url.Parse(fallbackUrl)
-			if err != nil {
-				panic(err)
-			}
-			agency.Url = fbUrl
-		}
 		if e == nil {
 			if _, ok := feed.Agencies[agency.Id]; ok {
 				e = errors.New("ID collision, agency_id '" + agency.Id + "' already used")
@@ -462,6 +455,14 @@ func (feed *Feed) parseAgencies(path string, prefix string, fallbackUrl string) 
 			} else {
 				panic(e)
 			}
+		}
+
+		if agency.Url == nil {
+			fbUrl, err := url.Parse(fallbackUrl)
+			if err != nil {
+				panic(err)
+			}
+			agency.Url = fbUrl
 		}
 
 		feed.Agencies[agency.Id] = agency
