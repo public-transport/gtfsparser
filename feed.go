@@ -105,6 +105,8 @@ type ParseOptions struct {
 	MOTFilterNeg          map[int16]bool
 	AssumeCleanCsv        bool
 	RemoveFillers         bool
+	UseGoogleSupportedRouteTypes bool
+	DropSingleStopTrips bool
 }
 
 type ErrStats struct {
@@ -212,7 +214,7 @@ func NewFeed() *Feed {
 		NumShpPoints:          0,
 		NumStopTimes:          0,
 		fastParsePossible:     true,
-		opts:                  ParseOptions{false, false, false, false, "", false, false, false, false, gtfs.Date{}, gtfs.Date{}, make([]Polygon, 0), false, make(map[int16]bool, 0), make(map[int16]bool, 0), false, false},
+		opts:                  ParseOptions{false, false, false, false, "", false, false, false, false, gtfs.Date{}, gtfs.Date{}, make([]Polygon, 0), false, make(map[int16]bool, 0), make(map[int16]bool, 0), false, false, false, false},
 	}
 	g.lastString = &g.emptyString
 
@@ -331,6 +333,14 @@ func (feed *Feed) PrefixParse(path string, prefix string) error {
 		feed.filterServices(prefix)
 	}
 
+	if feed.opts.DropSingleStopTrips {
+		for _, t := range feed.Trips {
+			if len(t.StopTimes) < 2 {
+				feed.DeleteTrip(t.Id)
+			}
+		}
+	}
+
 	return e
 }
 
@@ -339,7 +349,7 @@ func (feed *Feed) filterServices(prefix string) {
 	for _, t := range feed.Trips {
 		s := t.Service
 		if (s.IsEmpty() && s.Start_date().IsEmpty() && s.End_date().IsEmpty()) || s.GetFirstActiveDate().IsEmpty() {
-			delete(feed.Trips, t.Id)
+			feed.DeleteTrip(t.Id)
 			toDel = append(toDel, s)
 		}
 	}
@@ -679,8 +689,13 @@ func (feed *Feed) parseRoutes(path string, prefix string, filtered map[string]st
 				panic(e)
 			}
 		}
+
 		if feed.opts.UseStandardRouteTypes {
 			route.Type = gtfs.GetTypeFromExtended(route.Type)
+		}
+
+		if feed.opts.UseGoogleSupportedRouteTypes {
+			route.Type = gtfs.GetSupportedExtendedTypeFromExtended(route.Type)
 		}
 
 		if len(feed.opts.MOTFilter) != 0 {
