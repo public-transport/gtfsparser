@@ -104,6 +104,7 @@ type ParseOptions struct {
 	MOTFilter             map[int16]bool
 	MOTFilterNeg          map[int16]bool
 	AssumeCleanCsv        bool
+	RemoveFillers         bool
 }
 
 type ErrStats struct {
@@ -211,7 +212,7 @@ func NewFeed() *Feed {
 		NumShpPoints:          0,
 		NumStopTimes:          0,
 		fastParsePossible:     true,
-		opts:                  ParseOptions{false, false, false, false, "", false, false, false, false, gtfs.Date{}, gtfs.Date{}, make([]Polygon, 0), false, make(map[int16]bool, 0), make(map[int16]bool, 0), false},
+		opts:                  ParseOptions{false, false, false, false, "", false, false, false, false, gtfs.Date{}, gtfs.Date{}, make([]Polygon, 0), false, make(map[int16]bool, 0), make(map[int16]bool, 0), false, false},
 	}
 	g.lastString = &g.emptyString
 
@@ -2008,13 +2009,13 @@ func polyContCheck(ax float64, ay float64, bx float64, by float64, cx float64, c
 	EPSILON := 0.00000001
 	if ay == by && ay == cy {
 		if !((bx <= ax && ax <= cx) ||
-			(cx <= ax && ax <= bx)) {
+		(cx <= ax && ax <= bx)) {
 			return 1
 		}
 		return 0
 	}
 	if math.Abs(ay-by) < EPSILON &&
-		math.Abs(ax-by) < EPSILON {
+	math.Abs(ax-by) < EPSILON {
 		return 0
 	}
 
@@ -2032,7 +2033,7 @@ func polyContCheck(ax float64, ay float64, bx float64, by float64, cx float64, c
 	}
 
 	d := (bx-ax)*(cy-ay) -
-		(by-ay)*(cx-ax)
+	(by-ay)*(cx-ax)
 
 	if d > 0 {
 		return -1
