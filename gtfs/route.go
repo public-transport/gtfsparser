@@ -256,3 +256,86 @@ func GetTypeFromExtended(t int16) int16 {
 
 	return 2 // fallback
 }
+
+func GetSupportedExtendedTypeFromExtended(t int16) int16 {
+	switch t {
+	case 104:
+		return 100
+	case 110:
+		return 100
+	case 111:
+		return 100
+	case 112:
+		return 100
+	case 113:
+		return 100
+	case 114:
+		return 100
+	case 115:
+		return 100
+	case 116:
+		return 100
+	case 117:
+		return 100
+	case 203:
+		return 200
+	case 204:
+		return 200
+	case 205:
+		return 200
+	case 206:
+		return 200
+	case 207:
+		return 200
+	case 208:
+		return 200
+	case 209:
+		return 200
+	case 300:
+		return 109
+	case 404:
+		return 400
+	case 703:
+		return 700
+	case 705:
+		return 700
+	case 706:
+		return 700
+	case 707:
+		return 700
+	case 708:
+		return 700
+	case 709:
+		return 700
+	case 710:
+		return 700
+	case 711:
+		return 700
+	case 712:
+		return 700
+	case 713:
+		return 700
+	case 714:
+		return 700
+	case 716:
+		return 700
+	case 901:
+		return 900
+	case 902:
+		return 900
+	case 903:
+		return 900
+	case 904:
+		return 900
+	case 905:
+		return 900
+	case 906:
+		return 900
+	case 1302:
+		return 900
+	default:
+		return t
+	}
+
+	return t // fallback
+}

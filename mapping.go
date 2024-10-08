@@ -926,6 +926,11 @@ func createRoute(r []string, flds RouteFields, feed *Feed, prefix string) (route
 	a.Short_name = getString(flds.routeShortName, r, flds.FldName(flds.routeShortName), false, false, "")
 	a.Long_name = getString(flds.routeLongName, r, flds.FldName(flds.routeLongName), false, false, "")
 
+	if feed.opts.RemoveFillers {
+		a.Short_name = removeFillers(a.Short_name)
+		a.Long_name = removeFillers(a.Long_name)
+	}
+
 	if len(a.Short_name) == 0 && len(a.Long_name) == 0 {
 		if feed.opts.UseDefValueOnError {
 			a.Short_name = "-"
@@ -939,7 +944,14 @@ func createRoute(r []string, flds RouteFields, feed *Feed, prefix string) (route
 	}
 
 	a.Desc = getString(flds.routeDesc, r, flds.FldName(flds.routeDesc), false, false, "")
+
+	if feed.opts.RemoveFillers {
+		a.Desc = removeFillers(a.Desc)
+	}
+
 	a.Type = int16(getRangeInt(flds.routeType, r, flds.FldName(flds.routeType), true, 0, 1702)) // allow extended route types
+
+
 	a.Url = getURL(flds.routeUrl, r, flds, false, feed.opts.UseDefValueOnError, feed)
 	a.Color = getColor(flds.routeColor, r, flds.FldName(flds.routeColor), false, "ffffff", feed.opts.UseDefValueOnError, feed)
 	a.Text_color = getColor(flds.routeTextColor, r, flds.FldName(flds.routeTextColor), false, "000000", feed.opts.UseDefValueOnError, feed)
@@ -1031,6 +1043,11 @@ func createStop(r []string, flds StopFields, feed *Feed, prefix string) (s *gtfs
 	a.Location_type = int8(getRangeIntWithDefault(flds.locationType, r, flds.FldName(flds.locationType), 0, 4, 0, feed.opts.UseDefValueOnError, feed))
 	a.Name = getString(flds.stopName, r, flds.FldName(flds.stopName), a.Location_type < 3, a.Location_type < 3, feed.opts.EmptyStringRepl)
 	a.Desc = getString(flds.stopDesc, r, flds.FldName(flds.stopDesc), false, false, "")
+
+	if feed.opts.RemoveFillers {
+		a.Desc = removeFillers(a.Desc)
+		a.Code = removeFillers(a.Code)
+	}
 
 	if a.Location_type < 3 {
 		a.Lat = getFloat(flds.stopLat, r, flds.FldName(flds.stopLat), true)
@@ -1708,6 +1725,13 @@ func getString(id int, r []string, fldName string, req bool, nonempty bool, empt
 
 func trimQuotes(s string) string {
 	return strings.TrimSpace(strings.Trim(strings.TrimSpace(s), "«»'\"`‹›„“‟”’‘‛"))
+}
+
+func removeFillers(s string) string {
+	if s == "." || s == "-" || s == ".." || s == "..." || s == "?" {
+		return ""
+	}
+	return s
 }
 
 func getURL(id int, r []string, flds Fields, req bool, ignErrs bool, feed *Feed) *url.URL {
