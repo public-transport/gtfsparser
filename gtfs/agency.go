@@ -17,7 +17,7 @@ type Agency struct {
 	Id           string
 	Name         string
 	Url          *url.URL
-	Timezone     *time.Location
+	Timezone     time.Location
 	Lang         LanguageISO6391
 	Phone        string
 	Fare_url     *url.URL

@@ -805,7 +805,7 @@ func createAgency(r []string, flds AgencyFields, feed *Feed, prefix string) (ag 
 	a.Id = prefix + getString(flds.agencyId, r, flds.FldName(flds.agencyId), false, false, "")
 	a.Name = getString(flds.agencyName, r, flds.FldName(flds.agencyName), true, true, feed.opts.EmptyStringRepl)
 	a.Url = getURL(flds.agencyUrl, r, flds, false, feed.opts.UseDefValueOnError, feed)
-	a.Timezone = getTimezone(flds.agencyTimezone, r, flds, true, feed.opts.UseDefValueOnError, feed)
+	a.Timezone = *getTimezone(flds.agencyTimezone, r, flds, true, feed.opts.UseDefValueOnError, feed)
 	a.Lang = getIsoLangCode(flds.agencyLang, r, flds.FldName(flds.agencyTimezone), false, feed.opts.UseDefValueOnError, feed)
 	a.Phone = getString(flds.agencyPhone, r, flds.FldName(flds.agencyPhone), false, false, "")
 	a.Fare_url = getURL(flds.agencyFareUrl, r, flds, false, feed.opts.UseDefValueOnError, feed)

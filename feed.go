@@ -12,7 +12,7 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"net/url"
+	url "net/url"
 	"os"
 	opath "path"
 	"sort"
@@ -90,26 +90,26 @@ func NewPolygon(outer [][2]float64, inners [][][2]float64) Polygon {
 
 // A ParseOptions object holds options for parsing a the feed
 type ParseOptions struct {
-	UseDefValueOnError    bool
-	DropErroneous         bool
-	DryRun                bool
-	CheckNullCoordinates  bool
-	EmptyStringRepl       string
-	EmptyAgencyUrlRepl    string
-	ZipFix                bool
-	ShowWarnings          bool
-	DropShapes            bool
-	KeepAddFlds           bool
-	DateFilterStart       gtfs.Date
-	DateFilterEnd         gtfs.Date
-	PolygonFilter         []Polygon
-	UseStandardRouteTypes bool
-	MOTFilter             map[int16]bool
-	MOTFilterNeg          map[int16]bool
-	AssumeCleanCsv        bool
-	RemoveFillers         bool
+	UseDefValueOnError           bool
+	DropErroneous                bool
+	DryRun                       bool
+	CheckNullCoordinates         bool
+	EmptyStringRepl              string
+	EmptyAgencyUrlRepl           string
+	ZipFix                       bool
+	ShowWarnings                 bool
+	DropShapes                   bool
+	KeepAddFlds                  bool
+	DateFilterStart              gtfs.Date
+	DateFilterEnd                gtfs.Date
+	PolygonFilter                []Polygon
+	UseStandardRouteTypes        bool
+	MOTFilter                    map[int16]bool
+	MOTFilterNeg                 map[int16]bool
+	AssumeCleanCsv               bool
+	RemoveFillers                bool
 	UseGoogleSupportedRouteTypes bool
-	DropSingleStopTrips bool
+	DropSingleStopTrips          bool
 }
 
 type ErrStats struct {
@@ -2035,13 +2035,13 @@ func polyContCheck(ax float64, ay float64, bx float64, by float64, cx float64, c
 	EPSILON := 0.00000001
 	if ay == by && ay == cy {
 		if !((bx <= ax && ax <= cx) ||
-		(cx <= ax && ax <= bx)) {
+			(cx <= ax && ax <= bx)) {
 			return 1
 		}
 		return 0
 	}
 	if math.Abs(ay-by) < EPSILON &&
-	math.Abs(ax-by) < EPSILON {
+		math.Abs(ax-by) < EPSILON {
 		return 0
 	}
 
@@ -2059,7 +2059,7 @@ func polyContCheck(ax float64, ay float64, bx float64, by float64, cx float64, c
 	}
 
 	d := (bx-ax)*(cy-ay) -
-	(by-ay)*(cx-ax)
+		(by-ay)*(cx-ax)
 
 	if d > 0 {
 		return -1
