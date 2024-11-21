@@ -951,7 +951,6 @@ func createRoute(r []string, flds RouteFields, feed *Feed, prefix string) (route
 
 	a.Type = int16(getRangeInt(flds.routeType, r, flds.FldName(flds.routeType), true, 0, 1702)) // allow extended route types
 
-
 	a.Url = getURL(flds.routeUrl, r, flds, false, feed.opts.UseDefValueOnError, feed)
 	a.Color = getColor(flds.routeColor, r, flds.FldName(flds.routeColor), false, "ffffff", feed.opts.UseDefValueOnError, feed)
 	a.Text_color = getColor(flds.routeTextColor, r, flds.FldName(flds.routeTextColor), false, "000000", feed.opts.UseDefValueOnError, feed)
@@ -1818,9 +1817,7 @@ func getTimezone(id int, r []string, flds Fields, req bool, ignErrs bool, feed *
 	} else if req {
 		panic(fmt.Errorf("expected required field '%s'", flds.FldName(id)))
 	}
-	emptyTz, _ := time.LoadLocation("")
-
-	return emptyTz
+	return nil
 }
 
 func getIsoLangCode(id int, r []string, fldName string, req bool, ignErrs bool, feed *Feed) gtfs.LanguageISO6391 {
