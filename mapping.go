@@ -1229,15 +1229,15 @@ func createStopTime(r []string, flds *StopTimeFields, feed *Feed, prefix string)
 	}
 
 	a.SetSequence(getRangeInt(flds.stopSequence, r, flds.FldName(flds.stopSequence), true, 0, int(^uint32(0)>>1)))
+	headsign := getString(flds.stopHeadsign, r, flds.FldName(flds.stopHeadsign), false, false, "")
 
-	/*
-	* There used to be logic here to store a custom headsign,
-	* if different from the default trip headsign.
-	* However, this causes a massive amount of inescapable allocation (>25% of all allocations).
-	* The code was likely defunct anyways, as the flds.stopSequence ID is negative, and for fields that are
-	* not required getString simply returned an empty string anyways.
-	 */
-	a.SetHeadsign(trip.Headsign)
+	// only store headsigns that are different to the default trip headsign
+	if len(headsign) > 0 && headsign != *trip.Headsign {
+		if *feed.lastString != headsign {
+			feed.lastString = &headsign
+		}
+		a.SetHeadsign(feed.lastString)
+	}
 
 	a.SetPickup_type(uint8(getRangeInt(flds.pickupType, r, flds.FldName(flds.pickupType), false, 0, 3)))
 	a.SetDrop_off_type(uint8(getRangeInt(flds.dropOffType, r, flds.FldName(flds.dropOffType), false, 0, 3)))
