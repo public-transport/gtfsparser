@@ -889,7 +889,10 @@ func createRoute(r []string, flds RouteFields, feed *Feed, prefix string) (route
 		} else {
 			if feed.opts.UseDefValueOnError {
 				if len(feed.Agencies) == 1 {
-					a.Agency = nil
+					for _, ag := range feed.Agencies {
+						a.Agency = ag
+						break
+					}
 				} else {
 					return nil, errors.New("Agency with id " + getString(flds.agencyId, r, flds.FldName(flds.agencyId), false, false, "") + " not found or erroneous, cannot fall back to no agency as there is more than one agency in agency.txt.")
 				}

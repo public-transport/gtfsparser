@@ -15,7 +15,12 @@ var valid_tz = []string{"Africa/Abidjan", "Africa/Accra", "Africa/Addis_Ababa", 
 
 // A Timezone describes a single timezone in the world
 type Timezone struct {
-	tz int16
+	tz       int16
+	location *time.Location
+}
+
+func (a Timezone) Equals(b Timezone) bool {
+	return a.tz == b.tz
 }
 
 // GetTzString returns the string representation of a timesone
@@ -29,23 +34,21 @@ func (a Timezone) GetTzString() string {
 // NewTimezone creates a new timezone object
 func NewTimezone(tofind string) (Timezone, error) {
 	if tofind == "" {
-		return Timezone{-1}, fmt.Errorf("'%s' is not a valid tz database timezone, see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones", tofind)
+		return Timezone{-1, nil}, fmt.Errorf("'%s' is not a valid tz database timezone, see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones", tofind)
 	}
 
 	// TODO: quadratic code...
 	for i, tz := range valid_tz {
 		if tz == tofind {
-			return Timezone{int16(i)}, nil
+			var location *time.Location
+			location, _ = time.LoadLocation(tz)
+			return Timezone{int16(i), location}, nil
 		}
 	}
-	return Timezone{-1}, fmt.Errorf("'%s' is not a valid tz database timezone, see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones", tofind)
+	return Timezone{-1, nil}, fmt.Errorf("'%s' is not a valid tz database timezone, see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones", tofind)
 }
 
 // GetLocation constructs a time.Location object from this GTFS timezone
 func (a Timezone) GetLocation() *time.Location {
-	timezone, err := time.LoadLocation(a.GetTzString())
-	if err == nil {
-		return timezone
-	}
-	return nil
+	return a.location
 }
