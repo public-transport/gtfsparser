@@ -450,7 +450,7 @@ func (feed *Feed) parseAgencies(path string, prefix string) (err error) {
 				break
 			}
 
-			if len(existingAgId) > 0 && feed.Agencies[existingAgId].Timezone.Equals(agency.Timezone) {
+			if len(existingAgId) > 0 && !feed.Agencies[existingAgId].Timezone.Equals(agency.Timezone) {
 				e = fmt.Errorf("Agency '%s' has a different timezone (%s) than existing agencies (%s). All agencies must have the same timezone.", agency.Id, agency.Timezone.GetTzString(), feed.Agencies[existingAgId].Timezone.GetTzString())
 			}
 		}
