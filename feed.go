@@ -454,7 +454,7 @@ func (feed *Feed) parseAgencies(path string, prefix string, fallbackUrl string) 
 			}
 
 			if len(existingAgId) > 0 && feed.Agencies[existingAgId].Timezone.String() != agency.Timezone.String() {
-				e = fmt.Errorf("agency '%s' has a different timezone (%s) than existing agencies (%s). All agencies must have the same timezone", agency.Id, agency.Timezone.String(), feed.Agencies[existingAgId].Timezone.String())
+				e = fmt.Errorf("Agency '%s' has a different timezone (%s) than existing agencies (%s). All agencies must have the same timezone.", agency.Id, agency.Timezone.String(), feed.Agencies[existingAgId].Timezone.String())
 			}
 		}
 
@@ -2141,6 +2141,8 @@ func (feed *Feed) DeleteFareAttribute(id string) {
 }
 
 func (feed *Feed) DeleteTrip(id string) {
+    feed.NumStopTimes -= len(feed.Trips[id].StopTimes)
+
 	delete(feed.Trips, id)
 
 	// delete additional fields from CSV
