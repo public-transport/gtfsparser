@@ -2141,7 +2141,11 @@ func (feed *Feed) DeleteFareAttribute(id string) {
 }
 
 func (feed *Feed) DeleteTrip(id string) {
-    feed.NumStopTimes -= len(feed.Trips[id].StopTimes)
+	trip := feed.Trips[id]
+	if trip == nil {
+		return
+	}
+	feed.NumStopTimes -= len(trip.StopTimes)
 
 	delete(feed.Trips, id)
 
