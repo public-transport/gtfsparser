@@ -19,6 +19,7 @@ import (
 
 	"github.com/public-transport/gtfsparser/gtfs"
 	"github.com/valyala/fastjson/fastfloat"
+	"golang.org/x/text/language"
 )
 
 // csv lookup structs
@@ -1825,21 +1826,20 @@ func getTimezone(id int, r []string, flds Fields, req bool, ignErrs bool, feed *
 	return nil
 }
 
-func getIsoLangCode(id int, r []string, fldName string, req bool, ignErrs bool, feed *Feed) gtfs.LanguageISO6391 {
+func getIsoLangCode(id int, r []string, fldName string, req bool, ignErrs bool, feed *Feed) *language.Tag {
 	if id >= 0 && id < len(r) && len(r[id]) > 0 {
-		l, e := gtfs.NewLanguageISO6391(r[id])
+		l, e := language.Parse(r[id])
 		if e != nil && (req || !ignErrs) {
 			panic(e)
 		} else if e != nil {
 			feed.warn(e)
-			return l
+			return &l
 		}
-		return l
+		return &l
 	} else if req {
 		panic(fmt.Errorf("Expected required field '%s'", fldName))
 	}
-	l, _ := gtfs.NewLanguageISO6391("")
-	return l
+	return nil
 }
 
 func getColor(id int, r []string, fldName string, req bool, def string, ignErrs bool, feed *Feed) string {

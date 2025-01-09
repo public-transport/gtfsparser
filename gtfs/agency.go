@@ -10,6 +10,7 @@ import (
 	mail "net/mail"
 	url "net/url"
 	"time"
+	"golang.org/x/text/language"
 )
 
 // An Agency represents a transit agency in GTFS
@@ -18,7 +19,7 @@ type Agency struct {
 	Name         string
 	Url          *url.URL
 	Timezone     time.Location
-	Lang         LanguageISO6391
+	Lang         *language.Tag
 	Phone        string
 	Fare_url     *url.URL
 	Email        *mail.Address

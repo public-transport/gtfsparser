@@ -6,10 +6,12 @@
 
 package gtfs
 
+import "golang.org/x/text/language"
+
 // A Translation holds a single translation for an entity in a GTFS table
 type Translation struct {
 	FieldName   string
-	Language    LanguageISO6391
+	Language    *language.Tag
 	Translation string
 	FieldValue  string
 }
