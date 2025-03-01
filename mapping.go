@@ -1206,7 +1206,7 @@ func createStopTime(r []string, flds *StopTimeFields, feed *Feed, prefix string)
 	}
 
 	if a.Stop().Location_type != 0 {
-		panic(errors.New("Stop " + a.Stop().Id + " (" + a.Stop().Name + ") has location_type != 0, cannot be used in stop_times.txt!"))
+		feed.warn(errors.New("Stop " + a.Stop().Id + " (" + a.Stop().Name + ") has location_type != 0, cannot be used in stop_times.txt!"))
 	}
 
 	a.SetArrival_time(getTime(flds.arrivalTime, r, flds.FldName(flds.arrivalTime)))
