@@ -2141,13 +2141,10 @@ func (feed *Feed) DeleteFareAttribute(id string) {
 }
 
 func (feed *Feed) DeleteTrip(id string) {
-	trip := feed.Trips[id]
-	if trip == nil {
-		return
+	if _, ok := feed.Trips[id]; ok {
+		feed.NumStopTimes -= len(feed.Trips[id].StopTimes)
+		delete(feed.Trips, id)
 	}
-	feed.NumStopTimes -= len(trip.StopTimes)
-
-	delete(feed.Trips, id)
 
 	// delete additional fields from CSV
 	for k := range feed.TripsAddFlds {
