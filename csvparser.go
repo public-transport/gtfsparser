@@ -11,6 +11,7 @@ import (
 	"encoding/csv"
 	"io"
 	"strings"
+	"github.com/dimchansky/utfbom"
 )
 
 type HeaderIdx map[string]int
@@ -38,7 +39,8 @@ type CsvParser struct {
 
 // NewCsvParser creates a new CsvParser
 func NewCsvParser(file io.Reader, silentfail bool, assumeclean bool) CsvParser {
-	reader := csv.NewReader(file)
+	sr, _ := utfbom.Skip(file)
+	reader := csv.NewReader(sr)
 	reader.TrimLeadingSpace = true
 	reader.LazyQuotes = true
 	reader.FieldsPerRecord = -1
