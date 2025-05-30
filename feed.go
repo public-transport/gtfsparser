@@ -162,6 +162,9 @@ type Feed struct {
 	AttributionsAddFlds   map[string]map[*gtfs.Attribution]string
 	TranslationsAddFlds   map[string]map[*gtfs.Translation]string
 
+	// content of files we don't handle
+	AdditionalFiles map[string][]byte
+
 	// this only holds feed-wide attributions
 	Attributions []*gtfs.Attribution
 
@@ -213,6 +216,7 @@ func NewFeed() *Feed {
 		TransfersAddFlds:      make(map[string]map[gtfs.TransferKey]string),
 		FeedInfosAddFlds:      make(map[string]map[*gtfs.FeedInfo]string),
 		AttributionsAddFlds:   make(map[string]map[*gtfs.Attribution]string),
+		AdditionalFiles:       make(map[string][]byte),
 		ErrorStats:            ErrStats{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 		NumShpPoints:          0,
 		NumStopTimes:          0,
@@ -321,6 +325,23 @@ func (feed *Feed) PrefixParse(path string, prefix string) error {
 	// e = feed.parseTranslations(path, prefix)
 	// }
 
+	if e == nil && feed.opts.KeepAddFlds {
+		var files []string
+		files, e = feed.listFiles(path)
+		for _, file := range files {
+			if feed.isHandledGTFSFile(file) {
+				continue
+			}
+			var r io.Reader
+			r, e = feed.getFile(path, file)
+			if e == nil {
+				var data []byte
+				data, e = io.ReadAll(r)
+				feed.AdditionalFiles[file] = data
+			}
+		}
+	}
+
 	// close open readers
 	if feed.zipFileCloser != nil {
 		feed.zipFileCloser.Close()
@@ -403,6 +424,35 @@ func (feed *Feed) getFile(path string, name string) (io.Reader, error) {
 	}
 
 	return nil, errors.New("not found")
+}
+
+func (feed *Feed) listFiles(path string) ([]string, error) {
+	var e error
+	if feed.zipFileCloser == nil {
+		// reuse existing opened zip file
+		feed.zipFileCloser, e = zip.OpenReader(path)
+	}
+
+	if e != nil {
+		return nil, e
+	}
+
+	// check for any directory that is a ZIP file
+	zipDir := feed.getGTFSDir()
+
+	if !feed.opts.ZipFix {
+		zipDir = ""
+	}
+
+	var result []string
+	for _, f := range feed.zipFileCloser.File {
+		d, n := opath.Split(f.Name)
+		if d == zipDir {
+			result = append(result, n)
+		}
+	}
+
+	return result, nil
 }
 
 func (feed *Feed) parseAgencies(path string, prefix string, fallbackUrl string) (err error) {
@@ -2070,11 +2120,7 @@ func polyContCheck(ax float64, ay float64, bx float64, by float64, cx float64, c
 	return 0
 }
 
-func (feed *Feed) getGTFSDir() string {
-	// count number of GTFS file occurances in folders,
-	// return the folder with the most GTFS files
-
-	pathm := make(map[string]int)
+func (feed *Feed) isHandledGTFSFile(name string) bool {
 	files := map[string]bool{
 		"agency.txt":          true,
 		"stops.txt":           true,
@@ -2093,9 +2139,19 @@ func (feed *Feed) getGTFSDir() string {
 		"feed_info.txt":       true,
 	}
 
+	return files[name]
+}
+
+func (feed *Feed) getGTFSDir() string {
+	// count number of GTFS file occurances in folders,
+	// return the folder with the most GTFS files
+
+	pathm := make(map[string]int)
+
+
 	for _, f := range feed.zipFileCloser.File {
 		dir, name := opath.Split(f.Name)
-		if files[name] {
+		if feed.isHandledGTFSFile(name) {
 			pathm[dir] = pathm[dir] + 1
 		}
 	}
