@@ -16,6 +16,7 @@ import (
 	"os"
 	opath "path"
 	"sort"
+	"strings"
 	"unicode"
 
 	"github.com/klauspost/compress/zip"
@@ -86,6 +87,11 @@ func NewPolygon(outer [][2]float64, inners [][][2]float64) Polygon {
 	}
 
 	return poly
+}
+
+type CsvFile struct {
+	Header []string
+	Data   [][]string
 }
 
 // A ParseOptions object holds options for parsing a the feed
@@ -163,6 +169,7 @@ type Feed struct {
 	TranslationsAddFlds   map[string]map[*gtfs.Translation]string
 
 	// content of files we don't handle
+	AdditionalCsvFiles map[string]CsvFile
 	AdditionalFiles map[string][]byte
 
 	// this only holds feed-wide attributions
@@ -216,6 +223,7 @@ func NewFeed() *Feed {
 		TransfersAddFlds:      make(map[string]map[gtfs.TransferKey]string),
 		FeedInfosAddFlds:      make(map[string]map[*gtfs.FeedInfo]string),
 		AttributionsAddFlds:   make(map[string]map[*gtfs.Attribution]string),
+		AdditionalCsvFiles:    make(map[string]CsvFile),
 		AdditionalFiles:       make(map[string][]byte),
 		ErrorStats:            ErrStats{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 		NumShpPoints:          0,
@@ -332,9 +340,22 @@ func (feed *Feed) PrefixParse(path string, prefix string) error {
 			if feed.isHandledGTFSFile(file) {
 				continue
 			}
-			var r io.Reader
-			r, e = feed.getFile(path, file)
-			if e == nil {
+
+			r, e := feed.getFile(path, file)
+			if e != nil {
+				break
+			}
+
+			// assume that .txt means CSV
+			if strings.HasSuffix(file, ".txt") {
+				reader := NewCsvParser(r, feed.opts.DropErroneous, false)
+				var csv CsvFile
+				csv.Header = reader.GetHeader()
+				for record := reader.ParseCsvLine(); record != nil; record = reader.ParseCsvLine() {
+					csv.Data = append(csv.Data, append(make([]string, 0, len(record)), record...))
+				}
+				feed.AdditionalCsvFiles[file] = csv
+			} else {
 				var data []byte
 				data, e = io.ReadAll(r)
 				feed.AdditionalFiles[file] = data
