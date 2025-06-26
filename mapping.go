@@ -1964,7 +1964,12 @@ func getRangeIntWithDefault(id int, r []string, fldName string, min int, max int
 
 func getFloat(id int, r []string, fldName string, req bool) float32 {
 	if id >= 0 && id < len(r) && len(r[id]) > 0 {
-		num, err := fastfloat.Parse(r[id])
+		// Skip positive sign
+		float := r[id];
+		if float[0] == '+' {
+			float = float[1:]
+		}
+		num, err := fastfloat.Parse(float)
 		if err != nil || math.IsNaN(num) {
 			// try with comma as decimal separator
 			num, err = fastfloat.Parse(strings.Replace(r[id], ",", "", 1))
