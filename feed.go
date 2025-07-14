@@ -449,6 +449,25 @@ func (feed *Feed) getFile(path string, name string) (io.Reader, error) {
 
 func (feed *Feed) listFiles(path string) ([]string, error) {
 	var e error
+	var result []string
+
+	fileInfo, e := os.Stat(path)
+	if e != nil {
+		return nil, e
+	}
+
+	if fileInfo.IsDir() {
+		if feed.curFileHandle != nil {
+			// close previous handle
+			feed.curFileHandle.Close()
+		}
+		entries, e := os.ReadDir(path)
+		for _, f := range entries {
+			result = append(result, f.Name())
+		}
+		return result, e
+	}
+
 	if feed.zipFileCloser == nil {
 		// reuse existing opened zip file
 		feed.zipFileCloser, e = zip.OpenReader(path)
@@ -465,7 +484,6 @@ func (feed *Feed) listFiles(path string) ([]string, error) {
 		zipDir = ""
 	}
 
-	var result []string
 	for _, f := range feed.zipFileCloser.File {
 		d, n := opath.Split(f.Name)
 		if d == zipDir {
