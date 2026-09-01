@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	url "net/url"
-	"os"
 	"sort"
 	"strings"
 
@@ -28,9 +27,6 @@ func (feed *Feed) PrefixParseReader(reader io.Reader, prefix string) error {
 	if err != nil {
 		return fmt.Errorf("reading gtfs archive: %w", err)
 	}
-
-	fmt.Println("bytes letti dal reader:", len(data))
-	os.WriteFile("/tmp/debug_gtfs.zip", data, 0644)
 
 	zip_reader, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
 	if err != nil {
@@ -888,8 +884,12 @@ func (feed *Feed) reserveStopTimesReader(file io.Reader, prefix string) (err err
 }
 
 func (feed *Feed) parseStopTimesReader(file io.Reader, prefix string, geofiltered map[string]struct{}, filteredTrips map[string]struct{}) (err error) {
-	reader := NewCsvParser(file, feed.Opts.DropErroneous, feed.Opts.AssumeCleanCsv && !feed.Opts.KeepAddFlds)
-	file2 := file
+	data, e := io.ReadAll(file)
+    if e != nil {
+        return errors.New("could not read stop_times.txt")
+    }
+
+	reader := NewCsvParser(bytes.NewReader(data), feed.Opts.DropErroneous, feed.Opts.AssumeCleanCsv && !feed.Opts.KeepAddFlds)
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -897,7 +897,6 @@ func (feed *Feed) parseStopTimesReader(file io.Reader, prefix string, geofiltere
 		}
 	}()
 
-	var e error
 	var record []string
 	flds := StopTimeFields{
 		tripId:            reader.headeridx.GetFldId("trip_id", -1),
@@ -920,11 +919,7 @@ func (feed *Feed) parseStopTimesReader(file io.Reader, prefix string, geofiltere
 		addFlds = addiFields(reader.header, flds)
 	}
 
-	if e != nil {
-		return errors.New("could not open required file stop_times.txt")
-	}
-
-	reader = NewCsvParser(file2, feed.Opts.DropErroneous, feed.Opts.AssumeCleanCsv && flds.stopHeadsign < 0)
+	reader = NewCsvParser(bytes.NewReader(data), feed.Opts.DropErroneous, feed.Opts.AssumeCleanCsv && flds.stopHeadsign < 0)
 
 	i := 0
 
