@@ -755,7 +755,13 @@ func (feed *Feed) parseShapesReader(file io.Reader, prefix string) (err error) {
 	if feed.Opts.DropShapes {
 		return
 	}
-	reader := NewCsvParser(file, feed.Opts.DropErroneous, feed.Opts.AssumeCleanCsv && !feed.Opts.KeepAddFlds)
+
+	data, e := io.ReadAll(file)
+    if e != nil {
+        return errors.New("could not read shapes.txt")
+    }
+
+    reader := NewCsvParser(bytes.NewReader(data), feed.Opts.DropErroneous, false)
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -763,7 +769,6 @@ func (feed *Feed) parseShapesReader(file io.Reader, prefix string) (err error) {
 		}
 	}()
 
-	var e error
 	var record []string
 	flds := ShapeFields{
 		shapeId:           reader.headeridx.GetFldId("shape_id", -1),
@@ -778,6 +783,8 @@ func (feed *Feed) parseShapesReader(file io.Reader, prefix string) (err error) {
 	if feed.Opts.KeepAddFlds {
 		addFlds = addiFields(reader.header, flds)
 	}
+
+    reader = NewCsvParser(bytes.NewReader(data), feed.Opts.DropErroneous, feed.Opts.AssumeCleanCsv && !feed.Opts.KeepAddFlds)
 
 	i := 0
 
