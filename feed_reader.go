@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	url "net/url"
+	"os"
 	"sort"
 	"strings"
 
@@ -27,6 +28,9 @@ func (feed *Feed) PrefixParseReader(reader io.Reader, prefix string) error {
 	if err != nil {
 		return fmt.Errorf("reading gtfs archive: %w", err)
 	}
+
+	fmt.Println("bytes letti dal reader:", len(data))
+	os.WriteFile("/tmp/debug_gtfs.zip", data, 0644)
 
 	zip_reader, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
 	if err != nil {
