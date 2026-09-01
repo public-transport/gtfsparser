@@ -714,7 +714,12 @@ func (feed *Feed) reserveShapesReader(file io.Reader, prefix string) (err error)
 		return
 	}
 
-	reader := NewCsvParser(file, feed.Opts.DropErroneous, feed.Opts.AssumeCleanCsv && !feed.Opts.KeepAddFlds)
+	data, e := io.ReadAll(file)
+    if e != nil {
+        return errors.New("could not read shapes.txt")
+    }
+
+    reader := NewCsvParser(bytes.NewReader(data), feed.Opts.DropErroneous, false)
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -722,7 +727,6 @@ func (feed *Feed) reserveShapesReader(file io.Reader, prefix string) (err error)
 		}
 	}()
 
-	var e error
 	var record []string
 	flds := ShapeFields{
 		shapeId:           reader.headeridx.GetFldId("shape_id", -1),
@@ -732,6 +736,7 @@ func (feed *Feed) reserveShapesReader(file io.Reader, prefix string) (err error)
 		shapePtSequence:   reader.headeridx.GetFldId("shape_pt_sequence", -5),
 	}
 
+    reader = NewCsvParser(bytes.NewReader(data), feed.Opts.DropErroneous, feed.Opts.AssumeCleanCsv && !feed.Opts.KeepAddFlds)
 	for record = reader.ParseCsvLine(); record != nil; record = reader.ParseCsvLine() {
 		e := reserveShapePoint(record, flds, feed, prefix)
 		if e != nil {
@@ -840,8 +845,12 @@ func (feed *Feed) parseShapesReader(file io.Reader, prefix string) (err error) {
 }
 
 func (feed *Feed) reserveStopTimesReader(file io.Reader, prefix string) (err error) {
-	reader := NewCsvParser(file, feed.Opts.DropErroneous, false)
-	file2 := file
+	data, e := io.ReadAll(file)
+    if e != nil {
+        return errors.New("could not read stop_times.txt")
+    }
+
+	reader := NewCsvParser(bytes.NewReader(data), feed.Opts.DropErroneous, false)
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -849,7 +858,6 @@ func (feed *Feed) reserveStopTimesReader(file io.Reader, prefix string) (err err
 		}
 	}()
 
-	var e error
 	var record []string
 	flds := StopTimeFields{
 		tripId:            reader.headeridx.GetFldId("trip_id", -1),
@@ -866,15 +874,11 @@ func (feed *Feed) reserveStopTimesReader(file io.Reader, prefix string) (err err
 		timepoint:         reader.headeridx.GetFldId("timepoint", -12),
 	}
 
-	if e != nil {
-		return errors.New("could not open required file stop_times.txt")
-	}
-
-	reader = NewCsvParser(file2, feed.Opts.DropErroneous, feed.Opts.AssumeCleanCsv && flds.stopHeadsign < 0 && !feed.Opts.KeepAddFlds)
-
+	reader = NewCsvParser(bytes.NewReader(data), feed.Opts.DropErroneous, feed.Opts.AssumeCleanCsv && flds.stopHeadsign < 0 && !feed.Opts.KeepAddFlds)
+    
 	for record = reader.ParseCsvLine(); record != nil; record = reader.ParseCsvLine() {
-		reserveStopTime(record, flds, feed, prefix)
-	}
+        reserveStopTime(record, flds, feed, prefix)
+    }
 
 	return e
 }
