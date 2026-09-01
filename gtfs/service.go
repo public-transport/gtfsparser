@@ -102,6 +102,10 @@ func (d Date) Month() uint8 {
 	return d.month
 }
 
+func (d *Date) SetMonth(month uint8) {
+	d.month = month
+}
+
 func (d Date) Year() uint16 {
 	return uint16(d.year) + 1900
 }

@@ -1,4 +1,4 @@
-module github.com/public-transport/gtfsparser
+module github.com/Leocraft1/gtfsparser-with-reader
 
 go 1.21
 

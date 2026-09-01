@@ -336,6 +336,4 @@ func GetSupportedExtendedTypeFromExtended(t int16) int16 {
 	default:
 		return t
 	}
-
-	return t // fallback
 }

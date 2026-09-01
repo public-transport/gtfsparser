@@ -176,6 +176,12 @@ func (a Time) GetLocationTime(d Date, agency *Agency) time.Time {
 	return time.Date(int(d.Year()), time.Month(d.Month()), int(d.Day()), int(a.Hour), int(a.Minute), int(a.Second), 0, &agency.Timezone)
 }
 
+// GetTime returns the time.Time of the gtfs time on a certain for Europe timezone
+func (a Time) GetTime() time.Time {
+	location, _:= time.LoadLocation("Europe/Rome")
+	return time.Date(2000, 1, 1, int(a.Hour), int(a.Minute), int(a.Second), 0, location)
+}
+
 // HasDistanceTraveled returns true if this ShapePoint has a measurement
 func (s StopTime) HasDistanceTraveled() bool {
 	return !math.IsNaN(float64(s.Shape_dist_traveled()))

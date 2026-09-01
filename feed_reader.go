@@ -1,256 +1,41 @@
-// Copyright 2023 Patrick Brosi
-// Authors: info@patrickbrosi.de
-//
-// Use of this source code is governed by a GPL v2
-// license that can be found in the LICENSE file
-
 package gtfsparserwr
 
 import (
-	// "archive/zip"
+	"archive/zip"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
-	"math"
 	url "net/url"
 	"os"
-	opath "path"
 	"sort"
 	"strings"
-	"unicode"
 
-	"github.com/klauspost/compress/zip"
 	"github.com/Leocraft1/gtfsparser-with-reader/gtfs"
 )
 
-// Holds the original column ordering
-type ColOrders struct {
-	Agencies           []string
-	Stops              []string
-	Routes             []string
-	Trips              []string
-	StopTimes          []string
-	Frequencies        []string
-	Calendar           []string
-	CalendarDates      []string
-	FareAttributes     []string
-	FareAttributeRules []string
-	Shapes             []string
-	Levels             []string
-	Pathways           []string
-	Transfers          []string
-	FeedInfos          []string
-	Attributions       []string
+// Parse the GTFS data from the specified io.Reader into the feed
+func (feed *Feed) ParseReader(reader io.Reader) error {
+	return feed.PrefixParseReader(reader, "")
 }
 
-type Polygon struct {
-	OuterRing  [][2]float64
-	InnerRings [][][2]float64
-	ll         [2]float64
-	ur         [2]float64
-}
-
-// NewPolygon creates a new Polygon from an outer ring
-func NewPolygon(outer [][2]float64, inners [][][2]float64) Polygon {
-	poly := Polygon{outer, inners, [2]float64{math.MaxFloat64, math.MaxFloat64}, [2]float64{-math.MaxFloat64, -math.MaxFloat64}}
-
-	for _, p := range outer {
-		if p[0] < poly.ll[0] {
-			poly.ll[0] = p[0]
-		}
-		if p[1] < poly.ll[1] {
-			poly.ll[1] = p[1]
-		}
-		if p[0] > poly.ur[0] {
-			poly.ur[0] = p[0]
-		}
-		if p[1] > poly.ur[1] {
-			poly.ur[1] = p[1]
-		}
-	}
-
-	for _, inner := range inners {
-		for _, p := range inner {
-			if p[0] < poly.ll[0] {
-				poly.ll[0] = p[0]
-			}
-			if p[1] < poly.ll[1] {
-				poly.ll[1] = p[1]
-			}
-			if p[0] > poly.ur[0] {
-				poly.ur[0] = p[0]
-			}
-			if p[1] > poly.ur[1] {
-				poly.ur[1] = p[1]
-			}
-		}
-	}
-
-	return poly
-}
-
-type CsvFile struct {
-	Header []string
-	Data   [][]string
-}
-
-// A ParseOptions object holds options for parsing a the feed
-type ParseOptions struct {
-	UseDefValueOnError           bool
-	SkipStopTimeValidation       bool
-	DropErroneous                bool
-	DryRun                       bool
-	CheckNullCoordinates         bool
-	EmptyStringRepl              string
-	EmptyAgencyUrlRepl           string
-	ZipFix                       bool
-	ShowWarnings                 bool
-	DropShapes                   bool
-	KeepAddFlds                  bool
-	DateFilterStart              gtfs.Date
-	DateFilterEnd                gtfs.Date
-	PolygonFilter                []Polygon
-	UseStandardRouteTypes        bool
-	MOTFilter                    map[int16]bool
-	MOTFilterNeg                 map[int16]bool
-	AssumeCleanCsv               bool
-	RemoveFillers                bool
-	UseGoogleSupportedRouteTypes bool
-	DropSingleStopTrips          bool
-}
-
-type ErrStats struct {
-	DroppedAgencies           int
-	DroppedStops              int
-	DroppedRoutes             int
-	DroppedTrips              int
-	DroppedStopTimes          int
-	DroppedFrequencies        int
-	DroppedServices           int
-	DroppedFareAttributes     int
-	DroppedFareAttributeRules int
-	DroppedAttributions       int
-	DroppedShapes             int
-	DroppedLevels             int
-	DroppedPathways           int
-	DroppedTransfers          int
-	DroppedFeedInfos          int
-	DroppedTranslations       int
-	NumTranslations           int
-}
-
-// Feed represents a single GTFS feed
-type Feed struct {
-	Agencies       map[string]*gtfs.Agency
-	Stops          map[string]*gtfs.Stop
-	Routes         map[string]*gtfs.Route
-	Trips          map[string]*gtfs.Trip
-	Services       map[string]*gtfs.Service
-	FareAttributes map[string]*gtfs.FareAttribute
-	Shapes         map[string]*gtfs.Shape
-	Levels         map[string]*gtfs.Level
-	Pathways       map[string]*gtfs.Pathway
-	Transfers      map[gtfs.TransferKey]gtfs.TransferVal
-	FeedInfos      []*gtfs.FeedInfo
-
-	StopsAddFlds          map[string]map[string]string
-	AgenciesAddFlds       map[string]map[string]string
-	RoutesAddFlds         map[string]map[string]string
-	TripsAddFlds          map[string]map[string]string
-	StopTimesAddFlds      map[string]map[string]map[int]string
-	FrequenciesAddFlds    map[string]map[string]map[*gtfs.Frequency]string
-	ShapesAddFlds         map[string]map[string]map[int]string
-	FareRulesAddFlds      map[string]map[string]map[*gtfs.FareAttributeRule]string
-	LevelsAddFlds         map[string]map[string]string
-	PathwaysAddFlds       map[string]map[string]string
-	FareAttributesAddFlds map[string]map[string]string
-	TransfersAddFlds      map[string]map[gtfs.TransferKey]string
-	FeedInfosAddFlds      map[string]map[*gtfs.FeedInfo]string
-	AttributionsAddFlds   map[string]map[*gtfs.Attribution]string
-	TranslationsAddFlds   map[string]map[*gtfs.Translation]string
-
-	// content of files we don't handle
-	AdditionalCsvFiles map[string]CsvFile
-	AdditionalFiles map[string][]byte
-
-	// this only holds feed-wide attributions
-	Attributions []*gtfs.Attribution
-
-	ErrorStats   ErrStats
-	NumShpPoints int
-	NumStopTimes int
-
-	ColOrders ColOrders
-
-	lastTrip  *gtfs.Trip
-	lastShape *gtfs.Shape
-
-	zipFileCloser *zip.ReadCloser
-	curFileHandle *os.File
-
-	lastString  *string
-	emptyString string
-
-	fastParsePossible bool
-
-	Opts ParseOptions
-}
-
-// NewFeed creates a new, empty feed
-func NewFeed() *Feed {
-	g := Feed{
-		Agencies:              make(map[string]*gtfs.Agency),
-		Stops:                 make(map[string]*gtfs.Stop),
-		Routes:                make(map[string]*gtfs.Route),
-		Trips:                 make(map[string]*gtfs.Trip),
-		Services:              make(map[string]*gtfs.Service),
-		FareAttributes:        make(map[string]*gtfs.FareAttribute),
-		Shapes:                make(map[string]*gtfs.Shape),
-		Levels:                make(map[string]*gtfs.Level),
-		Pathways:              make(map[string]*gtfs.Pathway),
-		Transfers:             make(map[gtfs.TransferKey]gtfs.TransferVal, 0),
-		FeedInfos:             make([]*gtfs.FeedInfo, 0),
-		StopsAddFlds:          make(map[string]map[string]string),
-		StopTimesAddFlds:      make(map[string]map[string]map[int]string),
-		FrequenciesAddFlds:    make(map[string]map[string]map[*gtfs.Frequency]string),
-		ShapesAddFlds:         make(map[string]map[string]map[int]string),
-		AgenciesAddFlds:       make(map[string]map[string]string),
-		RoutesAddFlds:         make(map[string]map[string]string),
-		TripsAddFlds:          make(map[string]map[string]string),
-		LevelsAddFlds:         make(map[string]map[string]string),
-		PathwaysAddFlds:       make(map[string]map[string]string),
-		FareAttributesAddFlds: make(map[string]map[string]string),
-		FareRulesAddFlds:      make(map[string]map[string]map[*gtfs.FareAttributeRule]string),
-		TransfersAddFlds:      make(map[string]map[gtfs.TransferKey]string),
-		FeedInfosAddFlds:      make(map[string]map[*gtfs.FeedInfo]string),
-		AttributionsAddFlds:   make(map[string]map[*gtfs.Attribution]string),
-		AdditionalCsvFiles:    make(map[string]CsvFile),
-		AdditionalFiles:       make(map[string][]byte),
-		ErrorStats:            ErrStats{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		NumShpPoints:          0,
-		NumStopTimes:          0,
-		fastParsePossible:     true,
-		Opts:                  ParseOptions{false, false, false, false, false, "", "", false, false, false, false, gtfs.Date{}, gtfs.Date{}, make([]Polygon, 0), false, make(map[int16]bool, 0), make(map[int16]bool, 0), false, false, false, false},
-	}
-	g.lastString = &g.emptyString
-
-	return &g
-}
-
-// SetParseOpts sets the ParseOptions for this feed
-func (feed *Feed) SetParseOpts(opts ParseOptions) {
-	feed.Opts = opts
-}
-
-// Parse the GTFS data in the specified folder into the feed
-func (feed *Feed) Parse(path string) error {
-	return feed.PrefixParse(path, "")
-}
-
-// Parse the GTFS data in the specified folder into the feed, use
-// and id prefix
-func (feed *Feed) PrefixParse(path string, prefix string) error {
+// Parse the GTFS data from the specified io.Reader into the feed, with prefix
+func (feed *Feed) PrefixParseReader(reader io.Reader, prefix string) error {
 	var e error
+
+	//Reads the reader parameter and uncompresses it if it's a directory
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		return fmt.Errorf("reading gtfs archive: %w", err)
+	}
+
+	fmt.Println("bytes letti dal reader:", len(data))
+	os.WriteFile("/tmp/debug_gtfs.zip", data, 0644)
+
+	zip_reader, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		return fmt.Errorf("opening gtfs zip: %w", err)
+	}
 
 	// holds stops that are dropped because of geometric filtering.
 	// if these are referenced later, we quietly ignore the error like
@@ -267,45 +52,65 @@ func (feed *Feed) PrefixParse(path string, prefix string) error {
 	// with -De
 	filteredTrips := make(map[string]struct{}, 0)
 
-	e = feed.parseAgencies(path, prefix, feed.Opts.EmptyAgencyUrlRepl)
+	e = feed.withFile(zip_reader, "agency.txt", true, func(r io.Reader) error {
+		return feed.parseAgenciesReader(r, prefix, feed.Opts.EmptyAgencyUrlRepl)
+	})
 	if e == nil {
-		e = feed.parseFeedInfos(path)
+		e = feed.withFile(zip_reader, "feed_info.txt", false, feed.parseFeedInfosReader)
 	}
 	if e == nil {
-		e = feed.parseLevels(path, prefix)
+		e = feed.withFile(zip_reader, "levels.txt", false, func(r io.Reader) error {
+			return feed.parseLevelsReader(r, prefix)
+		})
 	}
 	if e == nil {
-		e = feed.parseStops(path, prefix, geofilteredStops)
+		e = feed.withFile(zip_reader, "stops.txt", true, func(r io.Reader) error {
+			return feed.parseStopsReader(r, prefix, geofilteredStops)
+		})
+	}
+	if e == nil && !feed.Opts.DropShapes {
+		e = feed.withFile(zip_reader, "shapes.txt", false, func(r io.Reader) error {
+			return feed.reserveShapesReader(r, prefix)
+		})
+		if e == nil {
+			e = feed.withFile(zip_reader, "shapes.txt", false, func(r io.Reader) error {
+				return feed.parseShapesReader(r, prefix)
+			})
+		}
 	}
 	if e == nil {
-		e = feed.reserveShapes(path, prefix)
+		e = feed.withFile(zip_reader, "routes.txt", true, func(r io.Reader) error {
+			return feed.parseRoutesReader(r, prefix, filteredRoutes)
+		})
 	}
 	if e == nil {
-		e = feed.parseShapes(path, prefix)
+		e = feed.withFile(zip_reader, "calendar.txt", false, func(r io.Reader) error {
+			return feed.parseCalendarReader(r, prefix)
+		})
 	}
 	if e == nil {
-		e = feed.parseRoutes(path, prefix, filteredRoutes)
+		e = feed.withFile(zip_reader, "calendar_dates.txt", false, func(r io.Reader) error {
+			return feed.parseCalendarDatesReader(r, prefix)
+		})
 	}
 	if e == nil {
-		e = feed.parseCalendar(path, prefix)
+		e = feed.withFile(zip_reader, "trips.txt", true, func(r io.Reader) error {
+			return feed.parseTripsReader(r, prefix, filteredRoutes, filteredTrips)
+		})
 	}
 	if e == nil {
-		e = feed.parseCalendarDates(path, prefix)
+		e = feed.withFile(zip_reader, "stop_times.txt", true, func(r io.Reader) error {
+			return feed.reserveStopTimesReader(r, prefix)
+		})
 	}
 	if e == nil {
-		e = feed.parseTrips(path, prefix, filteredRoutes, filteredTrips)
-	}
-
-	if e == nil {
-		e = feed.reserveStopTimes(path, prefix)
+		e = feed.withFile(zip_reader, "stop_times.txt", true, func(r io.Reader) error {
+			return feed.parseStopTimesReader(r, prefix, geofilteredStops, filteredTrips)
+		})
 	}
 	if e == nil {
-		e = feed.parseStopTimes(path, prefix, geofilteredStops, filteredTrips)
-	}
-	if e == nil {
-		// remove reservation markers
+		// Remove reservation markers
 		for tripId, t := range feed.Trips {
-			// might be nil on dry run
 			if t != nil && t.Id != tripId {
 				t.Id = tripId
 				t.StopTimes = make(gtfs.StopTimes, 0)
@@ -313,59 +118,55 @@ func (feed *Feed) PrefixParse(path string, prefix string) error {
 		}
 	}
 	if e == nil {
-		e = feed.parseFareAttributes(path, prefix)
+		e = feed.withFile(zip_reader, "fare_attributes.txt", false, func(r io.Reader) error {
+			return feed.parseFareAttributesReader(r, prefix)
+		})
 	}
 	if e == nil {
-		e = feed.parseFareAttributeRules(path, prefix, filteredRoutes)
+		e = feed.withFile(zip_reader, "fare_rules.txt", false, func(r io.Reader) error {
+			return feed.parseFareAttributeRulesReader(r, prefix, filteredRoutes)
+		})
 	}
 	if e == nil {
-		e = feed.parseFrequencies(path, prefix, filteredTrips)
+		e = feed.withFile(zip_reader, "frequencies.txt", false, func(r io.Reader) error {
+			return feed.parseFrequenciesReader(r, prefix, filteredTrips)
+		})
 	}
 	if e == nil {
-		e = feed.parseTransfers(path, prefix, geofilteredStops)
+		e = feed.withFile(zip_reader, "transfers.txt", false, func(r io.Reader) error {
+			return feed.parseTransfersReader(r, prefix, geofilteredStops)
+		})
 	}
 	if e == nil {
-		e = feed.parsePathways(path, prefix, geofilteredStops)
+		e = feed.withFile(zip_reader, "pathways.txt", false, func(r io.Reader) error {
+			return feed.parsePathwaysReader(r, prefix, geofilteredStops)
+		})
 	}
 	if e == nil {
-		e = feed.parseAttributions(path, prefix, filteredRoutes, filteredTrips)
+		e = feed.withFile(zip_reader, "attributions.txt", false, func(r io.Reader) error {
+			return feed.parseAttributionsReader(r, prefix, filteredRoutes, filteredTrips)
+		})
 	}
-	// if e == nil {
-	// e = feed.parseTranslations(path, prefix)
-	// }
 
-	//At this point, all possible GTFS is parsed, if there are extra files, it puts them under AdditionalFiles or AdditionalCsvFiles
-	if e == nil && feed.Opts.KeepAddFlds {
-		var files []string
-		files, e = feed.listFiles(path)
-		for _, file := range files {
-			if feed.isHandledGTFSFile(file) {
-				continue
-			}
+	// Nessun file/zip handle da chiudere qui: ogni chiamata a withFile
+	// apre e chiude il proprio reader internamente.
 
-			r, e := feed.getFile(path, file)
-			if e != nil {
-				break
-			}
+	if e == nil && (!feed.Opts.DateFilterStart.IsEmpty() || !feed.Opts.DateFilterEnd.IsEmpty()) {
+		feed.filterServices()
+	}
 
-			// assume that .txt means CSV
-			if strings.HasSuffix(file, ".txt") {
-				reader := NewCsvParser(r, feed.Opts.DropErroneous, false)
-				var csv CsvFile
-				csv.Header = reader.GetHeader()
-				for record := reader.ParseCsvLine(); record != nil; record = reader.ParseCsvLine() {
-					csv.Data = append(csv.Data, append(make([]string, 0, len(record)), record...))
-				}
-				feed.AdditionalCsvFiles[file] = csv
-			} else {
-				var data []byte
-				data, e = io.ReadAll(r)
-				feed.AdditionalFiles[file] = data
+	if e == nil && feed.Opts.DropSingleStopTrips {
+		for _, t := range feed.Trips {
+			if len(t.StopTimes) < 2 {
+				feed.DeleteTrip(t.Id)
 			}
 		}
 	}
 
-	// close open readers
+	//At this point, all possible GTFS is parsed, if there are extra files, it puts them under AdditionalFiles or AdditionalCsvFiles
+	//Deprecated because of lack of volunty to adapt it
+
+	//Close open readers
 	if feed.zipFileCloser != nil {
 		feed.zipFileCloser.Close()
 		feed.zipFileCloser = nil
@@ -391,118 +192,7 @@ func (feed *Feed) PrefixParse(path string, prefix string) error {
 	return e
 }
 
-func (feed *Feed) filterServices() {
-	toDel := make([]*gtfs.Service, 0)
-	for _, t := range feed.Trips {
-		s := t.Service
-		if (s.IsEmpty() && s.Start_date().IsEmpty() && s.End_date().IsEmpty()) || s.GetFirstActiveDate().IsEmpty() {
-			feed.DeleteTrip(t.Id)
-			toDel = append(toDel, s)
-		}
-	}
-
-	for _, s := range toDel {
-		delete(feed.Services, s.Id())
-	}
-}
-
-func (feed *Feed) getFile(path string, name string) (io.Reader, error) {
-	fileInfo, err := os.Stat(path)
-
-	if err != nil {
-		return nil, err
-	}
-
-	if fileInfo.IsDir() {
-		if feed.curFileHandle != nil {
-			// close previous handle
-			feed.curFileHandle.Close()
-		}
-
-		return os.Open(opath.Join(path, name))
-	}
-
-	var e error
-	if feed.zipFileCloser == nil {
-		// reuse existing opened zip file
-		feed.zipFileCloser, e = zip.OpenReader(path)
-	}
-
-	if e != nil {
-		return nil, e
-	}
-
-	// check for any directory that is a ZIP file
-	zipDir := feed.getGTFSDir()
-
-	if !feed.Opts.ZipFix {
-		zipDir = ""
-	}
-
-	for _, f := range feed.zipFileCloser.File {
-		d, n := opath.Split(f.Name)
-		if d == zipDir && n == name {
-			return f.Open()
-		}
-	}
-
-	return nil, errors.New("not found")
-}
-
-func (feed *Feed) listFiles(path string) ([]string, error) {
-	var e error
-	var result []string
-
-	fileInfo, e := os.Stat(path)
-	if e != nil {
-		return nil, e
-	}
-
-	if fileInfo.IsDir() {
-		if feed.curFileHandle != nil {
-			// close previous handle
-			feed.curFileHandle.Close()
-		}
-		entries, e := os.ReadDir(path)
-		for _, f := range entries {
-			result = append(result, f.Name())
-		}
-		return result, e
-	}
-
-	if feed.zipFileCloser == nil {
-		// reuse existing opened zip file
-		feed.zipFileCloser, e = zip.OpenReader(path)
-	}
-
-	if e != nil {
-		return nil, e
-	}
-
-	// check for any directory that is a ZIP file
-	zipDir := feed.getGTFSDir()
-
-	if !feed.Opts.ZipFix {
-		zipDir = ""
-	}
-
-	for _, f := range feed.zipFileCloser.File {
-		d, n := opath.Split(f.Name)
-		if d == zipDir {
-			result = append(result, n)
-		}
-	}
-
-	return result, nil
-}
-
-func (feed *Feed) parseAgencies(path string, prefix string, fallbackUrl string) (err error) {
-	file, e := feed.getFile(path, "agency.txt")
-
-	if e != nil {
-		return errors.New("could not open required file agency.txt")
-	}
-
+func (feed *Feed) parseAgenciesReader(file io.Reader, prefix string, fallbackUrl string) (err error) {
 	reader := NewCsvParser(file, feed.Opts.DropErroneous, false)
 
 	defer func() {
@@ -510,6 +200,7 @@ func (feed *Feed) parseAgencies(path string, prefix string, fallbackUrl string) 
 			err = ParseError{"agency.txt", reader.Curline, r.(error).Error()}
 		}
 	}()
+	var e error
 
 	var record []string
 	flds := AgencyFields{
@@ -585,13 +276,7 @@ func (feed *Feed) parseAgencies(path string, prefix string, fallbackUrl string) 
 	return e
 }
 
-func (feed *Feed) parseStops(path string, prefix string, geofiltered map[string]struct{}) (err error) {
-	file, e := feed.getFile(path, "stops.txt")
-
-	if e != nil {
-		return errors.New("could not open required file stops.txt")
-	}
-
+func (feed *Feed) parseStopsReader(file io.Reader, prefix string, geofiltered map[string]struct{}) (err error) {
 	reader := NewCsvParser(file, feed.Opts.DropErroneous, false)
 
 	defer func() {
@@ -599,6 +284,7 @@ func (feed *Feed) parseStops(path string, prefix string, geofiltered map[string]
 			err = ParseError{"stops.txt", reader.Curline, r.(error).Error()}
 		}
 	}()
+	var e error
 
 	var record []string
 	flds := StopFields{
@@ -738,13 +424,7 @@ func (feed *Feed) parseStops(path string, prefix string, geofiltered map[string]
 	return e
 }
 
-func (feed *Feed) parseRoutes(path string, prefix string, filtered map[string]struct{}) (err error) {
-	file, e := feed.getFile(path, "routes.txt")
-
-	if e != nil {
-		return errors.New("could not open required file routes.txt")
-	}
-
+func (feed *Feed) parseRoutesReader(file io.Reader, prefix string, filtered map[string]struct{}) (err error) {
 	reader := NewCsvParser(file, feed.Opts.DropErroneous, false)
 
 	defer func() {
@@ -753,6 +433,7 @@ func (feed *Feed) parseRoutes(path string, prefix string, filtered map[string]st
 		}
 	}()
 
+	var e error
 	var record []string
 	flds := RouteFields{
 		routeId:           reader.headeridx.GetFldId("route_id", -1),
@@ -836,14 +517,7 @@ func (feed *Feed) parseRoutes(path string, prefix string, filtered map[string]st
 	return e
 }
 
-func (feed *Feed) parseCalendar(path string, prefix string) (err error) {
-	file, e := feed.getFile(path, "calendar.txt")
-
-	if e != nil {
-		return nil
-	}
-
-	// reader := NewCsvParser(file, feed.Opts.DropErroneous, feed.Opts.AssumeCleanCsv && !feed.Opts.KeepAddFlds)
+func (feed *Feed) parseCalendarReader(file io.Reader, prefix string) (err error) {
 	reader := NewCsvParser(file, feed.Opts.DropErroneous, false)
 
 	defer func() {
@@ -852,6 +526,7 @@ func (feed *Feed) parseCalendar(path string, prefix string) (err error) {
 		}
 	}()
 
+	var e error
 	var record []string
 	flds := CalendarFields{
 		serviceId: reader.headeridx.GetFldId("service_id", -1),
@@ -913,14 +588,7 @@ func (feed *Feed) parseCalendar(path string, prefix string) (err error) {
 	return e
 }
 
-func (feed *Feed) parseCalendarDates(path string, prefix string) (err error) {
-	file, e := feed.getFile(path, "calendar_dates.txt")
-
-	if e != nil {
-		return nil
-	}
-
-	// reader := NewCsvParser(file, feed.Opts.DropErroneous, feed.Opts.AssumeCleanCsv && !feed.Opts.KeepAddFlds)
+func (feed *Feed) parseCalendarDatesReader(file io.Reader, prefix string) (err error) {
 	reader := NewCsvParser(file, feed.Opts.DropErroneous, false)
 
 	defer func() {
@@ -929,6 +597,7 @@ func (feed *Feed) parseCalendarDates(path string, prefix string) (err error) {
 		}
 	}()
 
+	var e error
 	var record []string
 	flds := CalendarDatesFields{
 		serviceId:     reader.headeridx.GetFldId("service_id", -1),
@@ -964,13 +633,7 @@ func (feed *Feed) parseCalendarDates(path string, prefix string) (err error) {
 	return e
 }
 
-func (feed *Feed) parseTrips(path string, prefix string, filteredRoutes map[string]struct{}, filteredTrips map[string]struct{}) (err error) {
-	file, e := feed.getFile(path, "trips.txt")
-
-	if e != nil {
-		return errors.New("could not open required file trips.txt")
-	}
-
+func (feed *Feed) parseTripsReader(file io.Reader, prefix string, filteredRoutes map[string]struct{}, filteredTrips map[string]struct{}) (err error) {
 	reader := NewCsvParser(file, feed.Opts.DropErroneous, false)
 
 	defer func() {
@@ -979,6 +642,7 @@ func (feed *Feed) parseTrips(path string, prefix string, filteredRoutes map[stri
 		}
 	}()
 
+	var e error
 	var record []string
 	flds := TripFields{
 		tripId:               reader.headeridx.GetFldId("trip_id", -1),
@@ -1049,17 +713,17 @@ func (feed *Feed) parseTrips(path string, prefix string, filteredRoutes map[stri
 	return e
 }
 
-func (feed *Feed) reserveShapes(path string, prefix string) (err error) {
+func (feed *Feed) reserveShapesReader(file io.Reader, prefix string) (err error) {
 	if feed.Opts.DropShapes {
 		return
 	}
-	file, e := feed.getFile(path, "shapes.txt")
 
-	if e != nil {
-		return nil
-	}
+	data, e := io.ReadAll(file)
+    if e != nil {
+        return errors.New("could not read shapes.txt")
+    }
 
-	reader := NewCsvParser(file, feed.Opts.DropErroneous, feed.Opts.AssumeCleanCsv && !feed.Opts.KeepAddFlds)
+    reader := NewCsvParser(bytes.NewReader(data), feed.Opts.DropErroneous, false)
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -1076,6 +740,7 @@ func (feed *Feed) reserveShapes(path string, prefix string) (err error) {
 		shapePtSequence:   reader.headeridx.GetFldId("shape_pt_sequence", -5),
 	}
 
+    reader = NewCsvParser(bytes.NewReader(data), feed.Opts.DropErroneous, feed.Opts.AssumeCleanCsv && !feed.Opts.KeepAddFlds)
 	for record = reader.ParseCsvLine(); record != nil; record = reader.ParseCsvLine() {
 		e := reserveShapePoint(record, flds, feed, prefix)
 		if e != nil {
@@ -1090,16 +755,10 @@ func (feed *Feed) reserveShapes(path string, prefix string) (err error) {
 	return e
 }
 
-func (feed *Feed) parseShapes(path string, prefix string) (err error) {
+func (feed *Feed) parseShapesReader(file io.Reader, prefix string) (err error) {
 	if feed.Opts.DropShapes {
 		return
 	}
-	file, e := feed.getFile(path, "shapes.txt")
-
-	if e != nil {
-		return nil
-	}
-
 	reader := NewCsvParser(file, feed.Opts.DropErroneous, feed.Opts.AssumeCleanCsv && !feed.Opts.KeepAddFlds)
 
 	defer func() {
@@ -1108,6 +767,7 @@ func (feed *Feed) parseShapes(path string, prefix string) (err error) {
 		}
 	}()
 
+	var e error
 	var record []string
 	flds := ShapeFields{
 		shapeId:           reader.headeridx.GetFldId("shape_id", -1),
@@ -1188,13 +848,13 @@ func (feed *Feed) parseShapes(path string, prefix string) (err error) {
 	return e
 }
 
-func (feed *Feed) reserveStopTimes(path string, prefix string) (err error) {
-	file, e := feed.getFile(path, "stop_times.txt")
+func (feed *Feed) reserveStopTimesReader(file io.Reader, prefix string) (err error) {
+	data, e := io.ReadAll(file)
+    if e != nil {
+        return errors.New("could not read stop_times.txt")
+    }
 
-	if e != nil {
-		return errors.New("could not open required file stop_times.txt")
-	}
-	reader := NewCsvParser(file, feed.Opts.DropErroneous, false)
+	reader := NewCsvParser(bytes.NewReader(data), feed.Opts.DropErroneous, false)
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -1218,28 +878,18 @@ func (feed *Feed) reserveStopTimes(path string, prefix string) (err error) {
 		timepoint:         reader.headeridx.GetFldId("timepoint", -12),
 	}
 
-	file, e = feed.getFile(path, "stop_times.txt")
-
-	if e != nil {
-		return errors.New("could not open required file stop_times.txt")
-	}
-
-	reader = NewCsvParser(file, feed.Opts.DropErroneous, feed.Opts.AssumeCleanCsv && flds.stopHeadsign < 0 && !feed.Opts.KeepAddFlds)
-
+	reader = NewCsvParser(bytes.NewReader(data), feed.Opts.DropErroneous, feed.Opts.AssumeCleanCsv && flds.stopHeadsign < 0 && !feed.Opts.KeepAddFlds)
+    
 	for record = reader.ParseCsvLine(); record != nil; record = reader.ParseCsvLine() {
-		reserveStopTime(record, flds, feed, prefix)
-	}
+        reserveStopTime(record, flds, feed, prefix)
+    }
 
 	return e
 }
 
-func (feed *Feed) parseStopTimes(path string, prefix string, geofiltered map[string]struct{}, filteredTrips map[string]struct{}) (err error) {
-	file, e := feed.getFile(path, "stop_times.txt")
-
-	if e != nil {
-		return errors.New("could not open required file stop_times.txt")
-	}
+func (feed *Feed) parseStopTimesReader(file io.Reader, prefix string, geofiltered map[string]struct{}, filteredTrips map[string]struct{}) (err error) {
 	reader := NewCsvParser(file, feed.Opts.DropErroneous, feed.Opts.AssumeCleanCsv && !feed.Opts.KeepAddFlds)
+	file2 := file
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -1247,6 +897,7 @@ func (feed *Feed) parseStopTimes(path string, prefix string, geofiltered map[str
 		}
 	}()
 
+	var e error
 	var record []string
 	flds := StopTimeFields{
 		tripId:            reader.headeridx.GetFldId("trip_id", -1),
@@ -1269,13 +920,11 @@ func (feed *Feed) parseStopTimes(path string, prefix string, geofiltered map[str
 		addFlds = addiFields(reader.header, flds)
 	}
 
-	file, e = feed.getFile(path, "stop_times.txt")
-
 	if e != nil {
 		return errors.New("could not open required file stop_times.txt")
 	}
 
-	reader = NewCsvParser(file, feed.Opts.DropErroneous, feed.Opts.AssumeCleanCsv && flds.stopHeadsign < 0)
+	reader = NewCsvParser(file2, feed.Opts.DropErroneous, feed.Opts.AssumeCleanCsv && flds.stopHeadsign < 0)
 
 	i := 0
 
@@ -1338,12 +987,7 @@ func (feed *Feed) parseStopTimes(path string, prefix string, geofiltered map[str
 	return e
 }
 
-func (feed *Feed) parseFrequencies(path string, prefix string, filteredTrips map[string]struct{}) (err error) {
-	file, e := feed.getFile(path, "frequencies.txt")
-
-	if e != nil {
-		return nil
-	}
+func (feed *Feed) parseFrequenciesReader(file io.Reader, prefix string, filteredTrips map[string]struct{}) (err error) {
 	reader := NewCsvParser(file, feed.Opts.DropErroneous, false)
 
 	defer func() {
@@ -1352,6 +996,7 @@ func (feed *Feed) parseFrequencies(path string, prefix string, filteredTrips map
 		}
 	}()
 
+	var e error
 	var record []string
 	flds := FrequencyFields{
 		tripId:      reader.headeridx.GetFldId("trip_id", -1),
@@ -1406,12 +1051,7 @@ func (feed *Feed) parseFrequencies(path string, prefix string, filteredTrips map
 	return e
 }
 
-func (feed *Feed) parseFareAttributes(path string, prefix string) (err error) {
-	file, e := feed.getFile(path, "fare_attributes.txt")
-
-	if e != nil {
-		return nil
-	}
+func (feed *Feed) parseFareAttributesReader(file io.Reader, prefix string) (err error) {
 	reader := NewCsvParser(file, feed.Opts.DropErroneous, false)
 
 	defer func() {
@@ -1420,6 +1060,7 @@ func (feed *Feed) parseFareAttributes(path string, prefix string) (err error) {
 		}
 	}()
 
+	var e error
 	var record []string
 	flds := FareAttributeFields{
 		fareId:           reader.headeridx.GetFldId("fare_id", -1),
@@ -1466,12 +1107,7 @@ func (feed *Feed) parseFareAttributes(path string, prefix string) (err error) {
 	return e
 }
 
-func (feed *Feed) parseFareAttributeRules(path string, prefix string, filteredRoutes map[string]struct{}) (err error) {
-	file, e := feed.getFile(path, "fare_rules.txt")
-
-	if e != nil {
-		return nil
-	}
+func (feed *Feed) parseFareAttributeRulesReader(file io.Reader, prefix string, filteredRoutes map[string]struct{}) (err error) {
 	reader := NewCsvParser(file, feed.Opts.DropErroneous, false)
 
 	defer func() {
@@ -1480,6 +1116,7 @@ func (feed *Feed) parseFareAttributeRules(path string, prefix string, filteredRo
 		}
 	}()
 
+	var e error
 	var record []string
 	flds := FareRuleFields{
 		fareId:        reader.headeridx.GetFldId("fare_id", -1),
@@ -1535,12 +1172,7 @@ func (feed *Feed) parseFareAttributeRules(path string, prefix string, filteredRo
 	return e
 }
 
-func (feed *Feed) parseTransfers(path string, prefix string, geofiltered map[string]struct{}) (err error) {
-	file, e := feed.getFile(path, "transfers.txt")
-
-	if e != nil {
-		return nil
-	}
+func (feed *Feed) parseTransfersReader(file io.Reader, prefix string, geofiltered map[string]struct{}) (err error) {
 	reader := NewCsvParser(file, feed.Opts.DropErroneous, false)
 
 	defer func() {
@@ -1549,6 +1181,7 @@ func (feed *Feed) parseTransfers(path string, prefix string, geofiltered map[str
 		}
 	}()
 
+	var e error
 	var record []string
 	flds := TransferFields{
 		FromStopId:      reader.headeridx.GetFldId("from_stop_id", -1),
@@ -1612,12 +1245,7 @@ func (feed *Feed) parseTransfers(path string, prefix string, geofiltered map[str
 	return e
 }
 
-func (feed *Feed) parsePathways(path string, prefix string, geofiltered map[string]struct{}) (err error) {
-	file, e := feed.getFile(path, "pathways.txt")
-
-	if e != nil {
-		return nil
-	}
+func (feed *Feed) parsePathwaysReader(file io.Reader, prefix string, geofiltered map[string]struct{}) (err error) {
 	reader := NewCsvParser(file, feed.Opts.DropErroneous, false)
 
 	defer func() {
@@ -1626,6 +1254,7 @@ func (feed *Feed) parsePathways(path string, prefix string, geofiltered map[stri
 		}
 	}()
 
+	var e error
 	var record []string
 	flds := PathwayFields{
 		pathwayId:            reader.headeridx.GetFldId("pathway_id", -1),
@@ -1690,73 +1319,7 @@ func (feed *Feed) parsePathways(path string, prefix string, geofiltered map[stri
 	return e
 }
 
-func (feed *Feed) parseTranslations(path string, prefix string) (err error) {
-	file, e := feed.getFile(path, "translations.txt")
-
-	if e != nil {
-		return nil
-	}
-	reader := NewCsvParser(file, feed.Opts.DropErroneous, false)
-
-	defer func() {
-		if r := recover(); r != nil {
-			err = ParseError{"translations.txt", reader.Curline, r.(error).Error()}
-		}
-	}()
-
-	var record []string
-	flds := TranslationFields{
-		tableName:   reader.headeridx.GetFldId("table_name", -1),
-		fieldName:   reader.headeridx.GetFldId("field_name", -2),
-		language:    reader.headeridx.GetFldId("language", -3),
-		translation: reader.headeridx.GetFldId("translation", -4),
-		recordId:    reader.headeridx.GetFldId("record_id", -5),
-		recordSubId: reader.headeridx.GetFldId("record_sub_id", -6),
-		fieldValue:  reader.headeridx.GetFldId("field_value", -7),
-	}
-
-	addFlds := make([]int, 0)
-
-	if feed.Opts.KeepAddFlds {
-		addFlds = addiFields(reader.header, flds)
-	}
-
-	for record = reader.ParseCsvLine(); record != nil; record = reader.ParseCsvLine() {
-		trans, e := createTranslation(record, flds, feed, prefix)
-		if e != nil {
-			if feed.Opts.DropErroneous {
-				feed.ErrorStats.DroppedTranslations++
-				feed.warn(e)
-				continue
-			} else {
-				panic(e)
-			}
-		}
-
-		feed.ErrorStats.NumTranslations++
-
-		for _, i := range addFlds {
-			if i < len(record) {
-				if _, ok := feed.TranslationsAddFlds[reader.header[i]]; !ok {
-					feed.TranslationsAddFlds[reader.header[i]] = make(map[*gtfs.Translation]string)
-				}
-
-				feed.TranslationsAddFlds[reader.header[i]][trans] = record[i]
-			}
-		}
-	}
-
-	feed.ColOrders.Attributions = append([]string(nil), reader.header...)
-
-	return e
-}
-
-func (feed *Feed) parseAttributions(path string, prefix string, filteredRoutes map[string]struct{}, filteredTrips map[string]struct{}) (err error) {
-	file, e := feed.getFile(path, "attributions.txt")
-
-	if e != nil {
-		return nil
-	}
+func (feed *Feed) parseAttributionsReader(file io.Reader, prefix string, filteredRoutes map[string]struct{}, filteredTrips map[string]struct{}) (err error) {
 	reader := NewCsvParser(file, feed.Opts.DropErroneous, false)
 
 	defer func() {
@@ -1767,6 +1330,7 @@ func (feed *Feed) parseAttributions(path string, prefix string, filteredRoutes m
 
 	ids := make(map[string]bool)
 
+	var e error
 	var record []string
 	flds := AttributionFields{
 		attributionId:    reader.headeridx.GetFldId("attribution_id", -1),
@@ -1857,12 +1421,7 @@ func (feed *Feed) parseAttributions(path string, prefix string, filteredRoutes m
 	return e
 }
 
-func (feed *Feed) parseLevels(path string, idprefix string) (err error) {
-	file, e := feed.getFile(path, "levels.txt")
-
-	if e != nil {
-		return nil
-	}
+func (feed *Feed) parseLevelsReader(file io.Reader, idprefix string) (err error) {
 	reader := NewCsvParser(file, feed.Opts.DropErroneous, false)
 
 	defer func() {
@@ -1871,6 +1430,7 @@ func (feed *Feed) parseLevels(path string, idprefix string) (err error) {
 		}
 	}()
 
+	var e error
 	var record []string
 	flds := LevelFields{
 		levelId:    reader.headeridx.GetFldId("level_id", -1),
@@ -1918,12 +1478,7 @@ func (feed *Feed) parseLevels(path string, idprefix string) (err error) {
 	return e
 }
 
-func (feed *Feed) parseFeedInfos(path string) (err error) {
-	file, e := feed.getFile(path, "feed_info.txt")
-
-	if e != nil {
-		return nil
-	}
+func (feed *Feed) parseFeedInfosReader(file io.Reader) (err error) {
 	reader := NewCsvParser(file, feed.Opts.DropErroneous, false)
 
 	defer func() {
@@ -1932,6 +1487,7 @@ func (feed *Feed) parseFeedInfos(path string) (err error) {
 		}
 	}()
 
+	var e error
 	var record []string
 	flds := FeedInfoFields{
 		feedPublisherName: reader.headeridx.GetFldId("feed_publisher_name", -1),
@@ -1980,389 +1536,41 @@ func (feed *Feed) parseFeedInfos(path string) (err error) {
 	return e
 }
 
-func (feed *Feed) checkShapeMeasure(shape *gtfs.Shape, opt *ParseOptions) error {
-	max := float32(math.Inf(-1))
-	deleted := 0
-	for j := 1; j < len(shape.Points)+deleted; j++ {
-		i := j - deleted
-
-		if shape.Points[i-1].Sequence == shape.Points[i].Sequence {
-			e := fmt.Errorf("in shape '%s' for point with seq=%d: stop time sequence collision. Sequence has to increase along shape", shape.Id, shape.Points[i].Sequence)
-			if feed.Opts.DropErroneous {
-				feed.ErrorStats.DroppedStopTimes++
-				shape.Points = shape.Points[:i+copy(shape.Points[i:], shape.Points[i+1:])]
-				feed.warn(e)
-				deleted++
-				continue
-			} else {
-				return e
-			}
+// withFile locates name inside the zip archive, opens it, invokes fn with
+// its content reader, and closes it afterwards. If the file is missing and
+// required is false, fn is silently skipped.
+// If required is true and the file is missing, an error is returned.
+func (feed *Feed) withFile(zr *zip.Reader, name string, required bool, fn func(io.Reader) error) error {
+	f := findZipFile(zr, name)
+	if f == nil {
+		if required {
+			return fmt.Errorf("required file %s not found in gtfs archive", name)
 		}
+		return nil
+	}
 
-		if shape.Points[i-1].HasDistanceTraveled() && shape.Points[i-1].Dist_traveled > max {
-			max = shape.Points[i-1].Dist_traveled
+	rc, err := f.Open()
+	if err != nil {
+		return fmt.Errorf("opening %s: %w", name, err)
+	}
+	defer rc.Close()
+
+	return fn(rc)
+}
+
+// findZipFile looks up a GTFS file by name. Falls back to matching the
+// basename in case the .txt files are nested inside a subfolder within
+// the zip (some non-conformant feeds do this).
+func findZipFile(zr *zip.Reader, name string) *zip.File {
+	for _, f := range zr.File {
+		if f.Name == name {
+			return f
 		}
-
-		if shape.Points[i].HasDistanceTraveled() && max > shape.Points[i].Dist_traveled {
-			e := fmt.Errorf("in shape '%s' for point with seq=%d shape_dist_traveled does not increase along with stop_sequence (%f > %f)", shape.Id, shape.Points[i].Sequence, max, shape.Points[i].Dist_traveled)
-			if opt.UseDefValueOnError {
-				shape.Points[i].Dist_traveled = float32(math.NaN())
-				feed.warn(e)
-			} else if opt.DropErroneous {
-				feed.ErrorStats.DroppedShapes++
-				feed.warn(e)
-				shape.Points = shape.Points[:i+copy(shape.Points[i:], shape.Points[i+1:])]
-				deleted++
-			} else {
-				return e
-			}
+	}
+	for _, f := range zr.File {
+		if strings.HasSuffix(f.Name, "/"+name) {
+			return f
 		}
 	}
 	return nil
-}
-
-func (feed *Feed) checkStopTimeMeasure(trip *gtfs.Trip, opt *ParseOptions) error {
-	max := float32(math.Inf(-1))
-	deleted := 0
-	for j := 1; j < len(trip.StopTimes)+deleted; j++ {
-		i := j - deleted
-
-		if trip.StopTimes[i-1].Sequence() == trip.StopTimes[i].Sequence() {
-			e := fmt.Errorf("in trip '%s' for stoptime with seq=%d: stop time sequence collision. Sequence has to increase along trip", trip.Id, trip.StopTimes[i].Sequence())
-			if feed.Opts.DropErroneous {
-				feed.ErrorStats.DroppedStopTimes++
-				trip.StopTimes = trip.StopTimes[:i+copy(trip.StopTimes[i:], trip.StopTimes[i+1:])]
-				feed.warn(e)
-				deleted++
-				continue
-			} else {
-				return e
-			}
-		}
-
-		if (!trip.StopTimes[i-1].Departure_time().Empty() && !trip.StopTimes[i].Arrival_time().Empty() && trip.StopTimes[i-1].Departure_time().SecondsSinceMidnight() > trip.StopTimes[i].Arrival_time().SecondsSinceMidnight()) && !feed.Opts.SkipStopTimeValidation {
-			e := fmt.Errorf("in trip '%s' for stoptime with seq=%d the arrival time is before the departure in the previous station", trip.Id, trip.StopTimes[i].Sequence())
-			if opt.DropErroneous {
-				feed.ErrorStats.DroppedStopTimes++
-				trip.StopTimes = trip.StopTimes[:i+copy(trip.StopTimes[i:], trip.StopTimes[i+1:])]
-				feed.warn(e)
-				deleted++
-				continue
-			} else {
-				return e
-			}
-		}
-
-		if trip.StopTimes[i-1].HasDistanceTraveled() && trip.StopTimes[i-1].Shape_dist_traveled() > max {
-			max = trip.StopTimes[i-1].Shape_dist_traveled()
-		}
-
-		if trip.StopTimes[i].HasDistanceTraveled() && max > trip.StopTimes[i].Shape_dist_traveled() {
-			e := fmt.Errorf("in trip '%s' for stoptime with seq=%d shape_dist_traveled does not increase along with stop_sequence (%f > %f)", trip.Id, trip.StopTimes[i].Sequence(), max, trip.StopTimes[i].Shape_dist_traveled())
-			if opt.UseDefValueOnError {
-				trip.StopTimes[i].SetShape_dist_traveled(float32(math.NaN()))
-				feed.warn(e)
-			} else if opt.DropErroneous {
-				trip.StopTimes = trip.StopTimes[:i+copy(trip.StopTimes[i:], trip.StopTimes[i+1:])]
-				feed.ErrorStats.DroppedStopTimes++
-				feed.warn(e)
-				deleted++
-				continue
-			} else {
-				return e
-			}
-		}
-	}
-	return nil
-}
-
-func (p *Polygon) PolyContains(x float64, y float64) bool {
-	if len(p.OuterRing) == 0 {
-		return false
-	}
-
-	// first check if contained in bounding box
-	if x < p.ll[0] || x > p.ur[0] || y < p.ll[1] || y > p.ur[1] {
-		return false
-	}
-
-	// see https://de.wikipedia.org/wiki/Punkt-in-Polygon-Test_nach_Jordan
-	c := int8(-1)
-
-	for i := 1; i < len(p.OuterRing); i++ {
-		c *= polyContCheck(x, y, p.OuterRing[i-1][0], p.OuterRing[i-1][1], p.OuterRing[i][0], p.OuterRing[i][1])
-		if c == 0 {
-			return true
-		}
-	}
-
-	c *= polyContCheck(x, y, p.OuterRing[len(p.OuterRing)-1][0], p.OuterRing[len(p.OuterRing)-1][1], p.OuterRing[0][0], p.OuterRing[0][1])
-
-	if c < 0 {
-		return false
-	}
-
-	for _, innerRing := range p.InnerRings {
-		c = int8(-1)
-
-		for i := 1; i < len(innerRing); i++ {
-			c *= polyContCheck(x, y, innerRing[i-1][0], innerRing[i-1][1], innerRing[i][0], innerRing[i][1])
-			if c == 0 {
-				return false
-			}
-		}
-
-		c *= polyContCheck(x, y, innerRing[len(innerRing)-1][0], innerRing[len(innerRing)-1][1], innerRing[0][0], innerRing[0][1])
-
-		if c >= 0 {
-			return false
-		}
-	}
-
-	return true
-}
-
-func polyContCheck(ax float64, ay float64, bx float64, by float64, cx float64, cy float64) int8 {
-	EPSILON := 0.00000001
-	if ay == by && ay == cy {
-		if !((bx <= ax && ax <= cx) ||
-			(cx <= ax && ax <= bx)) {
-			return 1
-		}
-		return 0
-	}
-	if math.Abs(ay-by) < EPSILON &&
-		math.Abs(ax-by) < EPSILON {
-		return 0
-	}
-
-	if by > cy {
-		tmpx := bx
-		tmpy := by
-		bx = cx
-		by = cy
-		cx = tmpx
-		cy = tmpy
-	}
-
-	if ay <= by || ay > cy {
-		return 1
-	}
-
-	d := (bx-ax)*(cy-ay) -
-		(by-ay)*(cx-ax)
-
-	if d > 0 {
-		return -1
-	}
-	if d < 0 {
-		return 1
-	}
-	return 0
-}
-
-func (feed *Feed) isHandledGTFSFile(name string) bool {
-	files := map[string]bool{
-		"agency.txt":          true,
-		"stops.txt":           true,
-		"routes.txt":          true,
-		"trips.txt":           true,
-		"stop_times.txt":      true,
-		"calendar.txt":        true,
-		"calendar_dates.txt":  true,
-		"fare_attributes.txt": true,
-		"fare_rules.txt":      true,
-		"shapes.txt":          true,
-		"frequencies.txt":     true,
-		"transfers.txt":       true,
-		"pathways.txt":        true,
-		"levels.txt":          true,
-		"feed_info.txt":       true,
-	}
-
-	return files[name]
-}
-
-func (feed *Feed) getGTFSDir() string {
-	// count number of GTFS file occurances in folders,
-	// return the folder with the most GTFS files
-
-	pathm := make(map[string]int)
-
-
-	for _, f := range feed.zipFileCloser.File {
-		dir, name := opath.Split(f.Name)
-		if feed.isHandledGTFSFile(name) {
-			pathm[dir] = pathm[dir] + 1
-		}
-	}
-
-	ret := ""
-	max := 0
-	for dir := range pathm {
-		if pathm[dir] > max {
-			max = pathm[dir]
-			ret = dir
-		}
-	}
-
-	return ret
-}
-
-func (feed *Feed) warn(e error) {
-	if feed.Opts.ShowWarnings {
-		fmt.Fprintln(os.Stderr, "WARNING: "+e.Error())
-	}
-}
-
-func (feed *Feed) DeletePathway(id string) {
-	delete(feed.FareAttributes, id)
-
-	// delete additional fields from CSV
-	for k := range feed.PathwaysAddFlds {
-		delete(feed.PathwaysAddFlds[k], id)
-	}
-}
-
-func (feed *Feed) DeleteFareAttribute(id string) {
-	delete(feed.FareAttributes, id)
-
-	// delete additional fields from CSV
-	for k := range feed.FareRulesAddFlds {
-		delete(feed.FareRulesAddFlds[k], id)
-	}
-
-	for k := range feed.FareAttributesAddFlds {
-		delete(feed.FareAttributesAddFlds[k], id)
-	}
-}
-
-func (feed *Feed) DeleteTrip(id string) {
-	if _, ok := feed.Trips[id]; ok {
-		feed.NumStopTimes -= len(feed.Trips[id].StopTimes)
-		delete(feed.Trips, id)
-	}
-
-	// delete additional fields from CSV
-	for k := range feed.TripsAddFlds {
-		delete(feed.TripsAddFlds[k], id)
-	}
-
-	for k := range feed.StopTimesAddFlds {
-		delete(feed.StopTimesAddFlds[k], id)
-	}
-
-	for k := range feed.FrequenciesAddFlds {
-		delete(feed.FrequenciesAddFlds[k], id)
-	}
-}
-
-func (feed *Feed) DeleteShape(id string) {
-	delete(feed.Shapes, id)
-
-	// delete additional fields from CSV
-	for k := range feed.ShapesAddFlds {
-		delete(feed.ShapesAddFlds[k], id)
-	}
-}
-
-func (feed *Feed) DeleteAgency(id string) {
-	delete(feed.Agencies, id)
-
-	// delete additional fields from CSV
-	for k := range feed.AgenciesAddFlds {
-		delete(feed.AgenciesAddFlds[k], id)
-	}
-}
-
-func (feed *Feed) DeleteRoute(id string) {
-	delete(feed.Routes, id)
-
-	// delete additional fields from CSV
-	for k := range feed.RoutesAddFlds {
-		delete(feed.RoutesAddFlds[k], id)
-	}
-}
-
-func (feed *Feed) DeleteLevel(id string) {
-	delete(feed.Levels, id)
-
-	// delete additional fields from CSV
-	for k := range feed.LevelsAddFlds {
-		delete(feed.LevelsAddFlds[k], id)
-	}
-}
-
-func (feed *Feed) DeleteStop(id string) {
-	delete(feed.Stops, id)
-
-	// delete additional fields from CSV
-	for k := range feed.StopsAddFlds {
-		delete(feed.StopsAddFlds[k], id)
-	}
-}
-
-func (feed *Feed) DeleteTransfer(tk gtfs.TransferKey) {
-	delete(feed.Transfers, tk)
-
-	// delete additional fields from CSV
-	for k := range feed.TransfersAddFlds {
-		delete(feed.TransfersAddFlds[k], tk)
-	}
-}
-
-func (feed *Feed) CleanTransfers() {
-	for tk := range feed.Transfers {
-		if tk.From_stop != nil {
-			if _, in := feed.Stops[tk.From_stop.Id]; !in {
-				feed.DeleteTransfer(tk)
-				continue
-			}
-		}
-		if tk.To_stop != nil {
-			if _, in := feed.Stops[tk.To_stop.Id]; !in {
-				feed.DeleteTransfer(tk)
-				continue
-			}
-		}
-		if tk.From_route != nil {
-			if _, in := feed.Routes[tk.From_route.Id]; !in {
-				feed.DeleteTransfer(tk)
-				continue
-			}
-		}
-		if tk.To_route != nil {
-			if _, in := feed.Routes[tk.To_route.Id]; !in {
-				feed.DeleteTransfer(tk)
-				continue
-			}
-		}
-
-		if tk.From_trip != nil {
-			if _, in := feed.Trips[tk.From_trip.Id]; !in {
-				feed.DeleteTransfer(tk)
-				continue
-			}
-		}
-
-		if tk.To_trip != nil {
-			if _, in := feed.Trips[tk.To_trip.Id]; !in {
-				feed.DeleteTransfer(tk)
-				continue
-			}
-		}
-	}
-}
-
-func (feed *Feed) DeleteService(id string) {
-	delete(feed.Services, id)
-}
-
-func isASCII(s string) bool {
-	for i := 0; i < len(s); i++ {
-		if s[i] > unicode.MaxASCII {
-			return false
-		}
-	}
-	return true
 }
